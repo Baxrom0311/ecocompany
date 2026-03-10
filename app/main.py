@@ -123,12 +123,13 @@ async def health_check():
 
 from app.routers import auth, products, categories, certificates
 from app.routers import gallery, contacts, settings as settings_router
-from app.routers import instagram, upload, chat
+from app.routers import instagram, upload, chat, seo
 
 # Auth
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 
 # Public API
+app.include_router(seo.router)
 app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(categories.router, prefix="/api/v1/categories", tags=["Categories"])
 app.include_router(certificates.router, prefix="/api/v1/certificates", tags=["Certificates"])
