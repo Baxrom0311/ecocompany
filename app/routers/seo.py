@@ -104,7 +104,7 @@ def _sitemap_index(base_url: str) -> str:
     )
 
 
-@router.get("/robots.txt")
+@router.api_route("/robots.txt", methods=["GET", "HEAD"])
 async def robots_txt(request: Request):
     base_url = _public_site_url(request)
     content = "\n".join(
@@ -119,12 +119,12 @@ async def robots_txt(request: Request):
     return _xml_response(content, "text/plain; charset=utf-8")
 
 
-@router.get("/sitemap.xml")
+@router.api_route("/sitemap.xml", methods=["GET", "HEAD"])
 async def sitemap_index(request: Request):
     return _xml_response(_sitemap_index(_public_site_url(request)), "application/xml; charset=utf-8")
 
 
-@router.get("/sitemaps/pages.xml")
+@router.api_route("/sitemaps/pages.xml", methods=["GET", "HEAD"])
 async def pages_sitemap(request: Request):
     base_url = _public_site_url(request)
     entries = [
@@ -138,7 +138,7 @@ async def pages_sitemap(request: Request):
     return _xml_response(_render_urlset(entries), "application/xml; charset=utf-8")
 
 
-@router.get("/sitemaps/products.xml")
+@router.api_route("/sitemaps/products.xml", methods=["GET", "HEAD"])
 async def products_sitemap(request: Request, db: Session = Depends(get_db)):
     base_url = _public_site_url(request)
     products = (
@@ -174,7 +174,7 @@ async def products_sitemap(request: Request, db: Session = Depends(get_db)):
     return _xml_response(_render_urlset(entries, image_namespace=True), "application/xml; charset=utf-8")
 
 
-@router.get("/sitemaps/media.xml")
+@router.api_route("/sitemaps/media.xml", methods=["GET", "HEAD"])
 async def media_sitemap(request: Request, db: Session = Depends(get_db)):
     base_url = _public_site_url(request)
     entries: list[str] = []
