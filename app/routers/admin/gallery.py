@@ -35,7 +35,10 @@ async def create_album(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    album = GalleryAlbum(**data.model_dump())
+    payload = data.model_dump()
+    payload["category"] = None
+    payload["is_active"] = True
+    album = GalleryAlbum(**payload)
     db.add(album)
     db.commit()
     db.refresh(album)
@@ -53,7 +56,10 @@ async def update_album(
     if not album:
         raise HTTPException(status_code=404, detail="Album topilmadi")
 
-    for key, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True)
+    update_data["category"] = None
+    update_data["is_active"] = True
+    for key, value in update_data.items():
         setattr(album, key, value)
 
     db.commit()
