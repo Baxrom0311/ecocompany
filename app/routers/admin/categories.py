@@ -42,7 +42,8 @@ async def create_category(
     if existing:
         raise HTTPException(status_code=409, detail="Bu slug allaqachon mavjud")
 
-    category = Category(**data.model_dump())
+    payload = data.model_dump(exclude={"icon", "is_active"})
+    category = Category(**payload, is_active=True)
     db.add(category)
     db.flush()
     log_action(db, current_user.id, "create", "category", category.id, ip_address=request.client.host if request.client else None)
@@ -65,8 +66,7 @@ async def update_category(
         raise HTTPException(status_code=404, detail="Kategoriya topilmadi")
 
     # Slug unique tekshirish
-    previous_icon = category.icon
-    update_data = data.model_dump(exclude_unset=True)
+    update_data = data.model_dump(exclude_unset=True, exclude={"icon", "is_active"})
     if "slug" in update_data:
         existing = (
             db.query(Category)
@@ -78,13 +78,12 @@ async def update_category(
 
     for key, value in update_data.items():
         setattr(category, key, value)
+    category.is_active = True
 
-    changes_json = data.model_dump(exclude_unset=True, mode='json')
+    changes_json = {**data.model_dump(exclude_unset=True, exclude={"icon", "is_active"}, mode='json'), "is_active": True}
     log_action(db, current_user.id, "update", "category", category.id, changes=changes_json, ip_address=request.client.host if request.client else None)
     db.commit()
     db.refresh(category)
-    if previous_icon and previous_icon != category.icon:
-        await storage_service.delete_file_by_url(previous_icon)
     return {"success": True, "data": CategoryResponse.model_validate(category)}
 
 

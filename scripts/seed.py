@@ -3,6 +3,7 @@
 ECO COMPANY — Seed Script
 Boshlang'ich ma'lumotlarni DB ga yuklash
 """
+import json
 import sys
 import os
 
@@ -10,6 +11,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import SessionLocal
 from app.models.setting import SiteSetting
+
+DEFAULT_PARTNER_LOGOS = [
+    "/media/partners/NGMK.jpg",
+    "/media/partners/MININNOVATION.jpg",
+    "/media/partners/UZAVTO.jpg",
+    "/media/partners/ONA.jpg",
+    "/media/partners/ICHF.jpg",
+    "/media/partners/NBU.jpg",
+    "/media/partners/URSU.jpg",
+]
 
 
 def seed_settings():
@@ -31,6 +42,7 @@ def seed_settings():
             ("hero_subtitle_uz", "ECO COMPANY — yuqori sifatli tozalangan suv", "text", "Hero tavsif (UZ)", True),
             ("hero_subtitle_ru", "ECO COMPANY — высококачественная очищенная вода", "text", "Hero tavsif (RU)", True),
             ("hero_subtitle_en", "ECO COMPANY — premium purified water", "text", "Hero subtitle (EN)", True),
+            ("hero_image_url", "", "image", "Hero rasmi", True),
             ("about_page_title_uz", "Kompaniya haqida", "text", "About page title (UZ)", True),
             ("about_page_title_ru", "О компании", "text", "About page title (RU)", True),
             ("about_page_title_en", "About Company", "text", "About page title (EN)", True),
@@ -59,6 +71,7 @@ def seed_settings():
             ("telegram_url", "https://t.me/ecocompany", "text", "Telegram", True),
             ("facebook_url", "", "text", "Facebook", True),
             ("youtube_url", "", "text", "YouTube", True),
+            ("partner_logos", json.dumps([]), "json", "Hamkor logolari", True),
         ]
 
         count = 0
