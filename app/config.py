@@ -29,8 +29,10 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_IDS: str = ""  # "id1,id2,id3"
 
-    # ── AI (Claude) ──
-    ANTHROPIC_API_KEY: str = ""
+    # ── AI (DeepSeek) ──
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+    DEEPSEEK_MODEL: str = "deepseek-chat"
 
     # ── Media Storage ──
     MEDIA_ROOT: str = "media"

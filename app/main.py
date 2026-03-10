@@ -16,6 +16,7 @@ from app.database import engine, Base
 from app.middleware.error_handler import setup_error_handlers
 from app.middleware.logging_middleware import LoggingMiddleware, setup_logging
 from app.middleware.security import SecurityHeadersMiddleware
+from app.services.company_mcp import mcp as company_mcp
 
 # ── Logger ──
 logger = logging.getLogger("ecocompany")
@@ -94,6 +95,11 @@ app.mount(
     settings.media_url_path,
     StaticFiles(directory=str(settings.media_root_path)),
     name="media",
+)
+app.mount(
+    "/api/v1/mcp",
+    company_mcp.http_app(path="/"),
+    name="company-mcp",
 )
 
 

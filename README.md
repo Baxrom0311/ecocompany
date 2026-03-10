@@ -7,7 +7,7 @@ FastAPI backend for ECO COMPANY website — clean water products & services.
 - **PostgreSQL** + **SQLAlchemy** 2.0 + **Alembic**
 - **JWT** auth (python-jose + bcrypt)
 - **Local media storage** — file uploads
-- **Anthropic Claude** — AI chatbot
+- **DeepSeek + FastMCP** — AI chatbot
 - **Telegram Bot** — admin notifications
 - **cPanel** deployment (Passenger WSGI)
 

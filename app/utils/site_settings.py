@@ -5,7 +5,9 @@ ECO COMPANY — Site settings key rules
 ENV_MANAGED_SETTING_KEYS = frozenset(
     {
         "admin_email",
-        "anthropic_api_key",
+        "deepseek_api_key",
+        "deepseek_base_url",
+        "deepseek_model",
         "instagram_access_token",
         "instagram_cache_hours",
         "instagram_user_id",

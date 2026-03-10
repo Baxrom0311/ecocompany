@@ -1,6 +1,6 @@
 """
 ECO COMPANY — Chat Router
-AI chatbot (Claude bilan, rate limited)
+AI chatbot (DeepSeek + FastMCP, rate limited)
 """
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
