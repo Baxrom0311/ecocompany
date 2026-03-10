@@ -12,10 +12,9 @@ router = APIRouter()
 
 @router.get("")
 async def get_certificates(db: Session = Depends(get_db)):
-    """Barcha aktiv sertifikatlar"""
+    """Barcha sertifikatlar"""
     certs = (
         db.query(Certificate)
-        .filter(Certificate.is_active == True)
         .order_by(Certificate.order_index.asc())
         .all()
     )

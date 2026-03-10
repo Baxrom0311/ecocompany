@@ -4,6 +4,7 @@ Mahsulotlar (public, faqat aktiv)
 """
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.product import Product
@@ -20,6 +21,7 @@ async def get_products(
     per_page: int = Query(12, ge=1, le=100),
     category_id: UUID | None = None,
     is_on_sale: bool | None = None,
+    search: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Barcha aktiv mahsulotlar (pagination bilan)"""
@@ -29,6 +31,19 @@ async def get_products(
         query = query.filter(Product.category_id == category_id)
     if is_on_sale:
         query = query.filter(Product.is_on_sale == True)
+    if search:
+        safe_search = search.replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{safe_search}%"
+        query = query.filter(
+            or_(
+                Product.name_uz.ilike(pattern),
+                Product.name_ru.ilike(pattern),
+                Product.name_en.ilike(pattern),
+                Product.desc_uz.ilike(pattern),
+                Product.desc_ru.ilike(pattern),
+                Product.desc_en.ilike(pattern),
+            )
+        )
 
     query = query.order_by(Product.order_index.asc())
     result = paginate(query, page, per_page)

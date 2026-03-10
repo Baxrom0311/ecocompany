@@ -10,6 +10,7 @@ from app.schemas.certificate import CertificateCreate, CertificateUpdate, Certif
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.services.audit_service import log_action
+from app.services import storage_service
 
 router = APIRouter()
 
@@ -30,7 +31,10 @@ async def create_certificate(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    cert = Certificate(**data.model_dump())
+    payload = data.model_dump()
+    payload["is_active"] = True
+    payload["is_downloadable"] = True
+    cert = Certificate(**payload)
     db.add(cert)
     db.flush()
     log_action(db, current_user.id, "create", "certificate", cert.id, ip_address=request.client.host if request.client else None)
@@ -51,7 +55,10 @@ async def update_certificate(
     if not cert:
         raise HTTPException(status_code=404, detail="Sertifikat topilmadi")
 
+    previous_urls = [cert.file_url, cert.preview_url]
     update_data = data.model_dump(exclude_unset=True)
+    update_data["is_active"] = True
+    update_data["is_downloadable"] = True
     for key, value in update_data.items():
         setattr(cert, key, value)
 
@@ -59,6 +66,9 @@ async def update_certificate(
     log_action(db, current_user.id, "update", "certificate", cert.id, changes=changes_json, ip_address=request.client.host if request.client else None)
     db.commit()
     db.refresh(cert)
+    await storage_service.delete_files_by_urls(
+        [url for url in previous_urls if url and url not in {cert.file_url, cert.preview_url}]
+    )
     return {"success": True, "data": CertificateResponse.model_validate(cert)}
 
 
@@ -73,7 +83,9 @@ async def delete_certificate(
     if not cert:
         raise HTTPException(status_code=404, detail="Sertifikat topilmadi")
 
+    previous_urls = [cert.file_url, cert.preview_url]
     log_action(db, current_user.id, "delete", "certificate", cert.id, ip_address=request.client.host if request.client else None)
     db.delete(cert)
     db.commit()
+    await storage_service.delete_files_by_urls(previous_urls)
     return {"success": True, "message": "Sertifikat o'chirildi"}

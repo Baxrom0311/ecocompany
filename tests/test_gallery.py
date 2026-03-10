@@ -13,12 +13,12 @@ class TestPublicCertificates:
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
-    def test_list_active_only(self, client, db):
+    def test_list_all(self, client, db):
         db.add(Certificate(title_uz="ISO 9001", file_url="https://x.com/cert.jpg", is_active=True))
         db.add(Certificate(title_uz="Noaktiv", file_url="https://x.com/n.jpg", is_active=False))
         db.commit()
         resp = client.get("/api/v1/certificates")
-        assert len(resp.json()["data"]) == 1
+        assert len(resp.json()["data"]) == 2
 
     def test_list_ordered(self, client, db):
         db.add(Certificate(title_uz="B", file_url="https://x.com/b.jpg", order_index=1, is_active=True))
@@ -33,11 +33,21 @@ class TestAdminCertificates:
     def test_create(self, client, admin_headers):
         resp = client.post("/api/v1/admin/certificates", headers=admin_headers, json={
             "title_uz": "GOST 2024",
-            "file_url": "https://cloudinary.com/gost.pdf",
-            "file_type": "pdf",
+            "file_url": "https://example.com/gost.jpg",
+            "file_type": "image",
         })
         assert resp.status_code == 201
         assert resp.json()["data"]["title_uz"] == "GOST 2024"
+        assert resp.json()["data"]["is_active"] is True
+        assert resp.json()["data"]["is_downloadable"] is True
+
+    def test_reject_pdf(self, client, admin_headers):
+        resp = client.post("/api/v1/admin/certificates", headers=admin_headers, json={
+            "title_uz": "PDF cert",
+            "file_url": "https://example.com/gost.pdf",
+            "file_type": "pdf",
+        })
+        assert resp.status_code == 422
 
     def test_update(self, client, admin_headers, db):
         cert = Certificate(title_uz="Eski", file_url="https://x.com/c.jpg")
@@ -179,6 +189,15 @@ class TestPublicSettings:
         assert "phone_1" in data
         assert "secret_key" not in data
 
+    def test_public_settings_excludes_env_managed_keys(self, client, db):
+        db.add(SiteSetting(key="smtp_password", value="secret", is_public=True))
+        db.add(SiteSetting(key="telegram_bot_token", value="token", is_public=True))
+        db.commit()
+
+        resp = client.get("/api/v1/settings/public")
+        assert resp.status_code == 200
+        assert resp.json()["data"] == {}
+
     def test_public_settings_empty(self, client):
         resp = client.get("/api/v1/settings/public")
         assert resp.status_code == 200
@@ -192,6 +211,19 @@ class TestAdminSettings:
         resp = client.get("/api/v1/admin/settings", headers=admin_headers)
         assert resp.status_code == 200
         assert len(resp.json()["data"]) >= 1
+
+    def test_editor_list_hides_non_public_and_env_managed(self, client, editor_headers, db):
+        db.add(SiteSetting(key="email", value="info@eco.uz", is_public=True))
+        db.add(SiteSetting(key="ai_system_prompt", value="secret prompt", is_public=False))
+        db.add(SiteSetting(key="smtp_password", value="super-secret", is_public=True))
+        db.commit()
+
+        resp = client.get("/api/v1/admin/settings", headers=editor_headers)
+        assert resp.status_code == 200
+        keys = {item["key"] for item in resp.json()["data"]}
+        assert "email" in keys
+        assert "ai_system_prompt" not in keys
+        assert "smtp_password" not in keys
 
     def test_upsert_existing(self, client, admin_headers, db):
         db.add(SiteSetting(key="phone_1", value="old"))
@@ -207,6 +239,12 @@ class TestAdminSettings:
         })
         assert resp.status_code == 200
 
+    def test_upsert_env_managed_key_rejected(self, client, admin_headers):
+        resp = client.put("/api/v1/admin/settings/smtp_password", headers=admin_headers, json={
+            "value": "secret",
+        })
+        assert resp.status_code == 400
+
     def test_bulk_update(self, client, admin_headers, db):
         db.add(SiteSetting(key="k1", value="v1"))
         db.commit()
@@ -218,6 +256,22 @@ class TestAdminSettings:
         assert resp.status_code == 200
         assert "2" in resp.json()["message"]
 
+    def test_bulk_update_rejects_env_managed_keys(self, client, admin_headers):
+        resp = client.put("/api/v1/admin/settings/bulk", headers=admin_headers, json=[
+            {"key": "smtp_password", "value": "secret"},
+        ])
+        assert resp.status_code == 400
+
+    def test_bulk_update_marks_prompt_non_public(self, client, admin_headers, db):
+        resp = client.put("/api/v1/admin/settings/bulk", headers=admin_headers, json=[
+            {"key": "ai_system_prompt", "value": "Updated system prompt for admins"},
+        ])
+        assert resp.status_code == 200
+
+        prompt = db.query(SiteSetting).filter(SiteSetting.key == "ai_system_prompt").first()
+        assert prompt is not None
+        assert prompt.is_public is False
+
 
 class TestInstagramPosts:
     def test_public_posts_empty(self, client):
@@ -228,3 +282,19 @@ class TestInstagramPosts:
     def test_admin_token_status(self, client, admin_headers):
         resp = client.get("/api/v1/admin/instagram/token-status", headers=admin_headers)
         assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["mode"] == "manual"
+        assert "link_count" in data
+
+    def test_save_instagram_links(self, client, admin_headers):
+        resp = client.put("/api/v1/admin/instagram/links", headers=admin_headers, json={
+            "items": [
+                {"url": "https://www.instagram.com/reel/C7M1abcd123/"},
+            ]
+        })
+        assert resp.status_code == 200
+        assert resp.json()["data"][0]["embed_url"].endswith("/embed")
+
+        public_resp = client.get("/api/v1/instagram/posts")
+        assert public_resp.status_code == 200
+        assert len(public_resp.json()["data"]) == 1

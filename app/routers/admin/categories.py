@@ -11,6 +11,7 @@ from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryRespons
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.services.audit_service import log_action
+from app.services import storage_service
 
 router = APIRouter()
 
@@ -64,6 +65,7 @@ async def update_category(
         raise HTTPException(status_code=404, detail="Kategoriya topilmadi")
 
     # Slug unique tekshirish
+    previous_icon = category.icon
     update_data = data.model_dump(exclude_unset=True)
     if "slug" in update_data:
         existing = (
@@ -81,6 +83,8 @@ async def update_category(
     log_action(db, current_user.id, "update", "category", category.id, changes=changes_json, ip_address=request.client.host if request.client else None)
     db.commit()
     db.refresh(category)
+    if previous_icon and previous_icon != category.icon:
+        await storage_service.delete_file_by_url(previous_icon)
     return {"success": True, "data": CategoryResponse.model_validate(category)}
 
 
@@ -104,7 +108,10 @@ async def delete_category(
             detail=f"Bu kategoriyada {product_count} ta mahsulot bor. Avval ularni o'chiring.",
         )
 
+    previous_icon = category.icon
     log_action(db, current_user.id, "delete", "category", category.id, ip_address=request.client.host if request.client else None)
     db.delete(category)
     db.commit()
+    if previous_icon:
+        await storage_service.delete_file_by_url(previous_icon)
     return {"success": True, "message": "Kategoriya o'chirildi"}

@@ -33,7 +33,7 @@ class Product(Base, UUIDMixin, TimestampMixin):
     is_on_sale = Column(Boolean, default=False, nullable=False)  # Tez filtrlash
 
     # ── Media ──
-    images = Column(JSON, default=list, nullable=False)  # Cloudinary URLs ["url1", "url2"]
+    images = Column(JSON, default=list, nullable=False)  # Media URLs ["url1", "url2"]
 
     # ── Holat ──
     is_featured = Column(Boolean, default=False, nullable=False)

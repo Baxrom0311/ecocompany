@@ -73,3 +73,27 @@ def admin_token(admin_user):
 @pytest.fixture(scope="function")
 def admin_headers(admin_token):
     return {"Authorization": f"Bearer {admin_token}"}
+
+
+@pytest.fixture(scope="function")
+def editor_user(db):
+    user = User(
+        email="editor@test.com",
+        password=hash_password("Editor123!"),
+        name="Test Editor",
+        role="editor",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@pytest.fixture(scope="function")
+def editor_token(editor_user):
+    return create_access_token({"sub": str(editor_user.id)})
+
+
+@pytest.fixture(scope="function")
+def editor_headers(editor_token):
+    return {"Authorization": f"Bearer {editor_token}"}

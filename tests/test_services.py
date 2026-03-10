@@ -1,7 +1,8 @@
 """
-Test Services — audit_service, email_service, telegram_service, cloudinary_service, instagram_service
+Test Services — audit_service, email_service, telegram_service, storage_service, instagram_service
 Using mocks for external APIs
 """
+import pytest
 import uuid
 from unittest.mock import patch, AsyncMock, MagicMock
 from app.services.audit_service import log_action
@@ -52,36 +53,36 @@ class TestAuditService:
         assert db.query(AuditLog).count() == 3
 
 
-class TestCloudinaryService:
-    @patch("app.services.cloudinary_service.cloudinary.uploader.upload")
-    async def test_upload_file_mock(self, mock_upload):
-        from app.services.cloudinary_service import upload_file
+class TestStorageService:
+    async def test_upload_file_mock(self, tmp_path, monkeypatch):
+        from app.services.storage_service import upload_file
+        from app.config import settings
 
-        mock_upload.return_value = {
-            "secure_url": "https://cdn.com/img.jpg",
-            "public_id": "eco/img",
-            "width": 800,
-            "height": 600,
-        }
-
+        monkeypatch.setattr(settings, "MEDIA_ROOT", str(tmp_path))
         mock_file = AsyncMock()
         mock_file.read.return_value = b"fake data"
-        result = await upload_file(mock_file, folder="products")
-        assert result["url"] == "https://cdn.com/img.jpg"
+        mock_file.filename = "photo.jpg"
+        result = await upload_file(mock_file, folder="products", base_url="http://testserver")
+        assert result["url"].startswith("http://testserver/media/products/")
+        assert (tmp_path / result["public_id"]).exists()
 
-    @patch("app.services.cloudinary_service.cloudinary.uploader.destroy")
-    async def test_delete_file_mock(self, mock_destroy):
-        from app.services.cloudinary_service import delete_file
+    async def test_delete_file_mock(self, tmp_path, monkeypatch):
+        from app.services.storage_service import delete_file
+        from app.config import settings
 
-        mock_destroy.return_value = {"result": "ok"}
-        result = await delete_file("eco/img")
+        monkeypatch.setattr(settings, "MEDIA_ROOT", str(tmp_path))
+        target = tmp_path / "products" / "file.jpg"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"test")
+        result = await delete_file("products/file.jpg")
         assert result is True
+        assert not target.exists()
 
-    @patch("app.services.cloudinary_service.cloudinary.uploader.destroy")
-    async def test_delete_file_not_found(self, mock_destroy):
-        from app.services.cloudinary_service import delete_file
+    async def test_delete_file_not_found(self, tmp_path, monkeypatch):
+        from app.services.storage_service import delete_file
+        from app.config import settings
 
-        mock_destroy.return_value = {"result": "not found"}
+        monkeypatch.setattr(settings, "MEDIA_ROOT", str(tmp_path))
         result = await delete_file("nonexistent")
         assert result is False
 
@@ -160,22 +161,28 @@ class TestTelegramService:
 
 
 class TestInstagramService:
-    @patch("app.services.instagram_service.httpx.AsyncClient.get", new_callable=AsyncMock)
-    async def test_fetch_posts_mock(self, mock_get):
-        from app.services.instagram_service import fetch_and_cache_posts
+    def test_save_and_read_manual_links(self, db):
+        from app.services.instagram_service import get_manual_links, save_manual_links
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [
-                {"id": "1", "media_type": "IMAGE", "media_url": "https://x.com/1.jpg", "timestamp": "2024-01-01T00:00:00Z"},
-                {"id": "2", "media_type": "VIDEO", "media_url": "https://x.com/2.mp4", "timestamp": "2024-01-02T00:00:00Z"},
-            ]
-        }
-        mock_get.return_value = mock_response
+        save_manual_links(db, [
+            {"url": "https://www.instagram.com/reel/C7M1abcd123/"},
+        ])
+        links = get_manual_links(db)
 
-    async def test_get_token_status_no_token(self):
-        """Token yo'q bo'lsa xavfsiz javob"""
-        from app.services.instagram_service import get_token_status
-        status = await get_token_status()
-        assert "is_valid" in status or status is not None
+        assert len(links) == 1
+        assert links[0]["embed_url"].endswith("/embed")
+
+    def test_reject_invalid_instagram_links(self, db):
+        from app.services.instagram_service import save_manual_links
+
+        with pytest.raises(ValueError):
+            save_manual_links(db, [
+                {"url": "https://youtube.com/watch?v=123"},
+            ])
+
+    def test_manual_status(self, db):
+        from app.services.instagram_service import get_manual_status
+
+        status = get_manual_status(db)
+        assert status["mode"] == "manual"
+        assert "link_count" in status

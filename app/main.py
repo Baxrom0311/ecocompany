@@ -6,6 +6,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
     """Startup va shutdown events"""
     # STARTUP
     setup_logging()
+    settings.media_root_path.mkdir(parents=True, exist_ok=True)
     logger.info("🌿 ECO COMPANY Backend ishga tushdi")
     logger.info(f"📌 Environment: {settings.ENVIRONMENT}")
 
@@ -85,6 +87,14 @@ app.add_middleware(LoggingMiddleware)
 
 # ── Error Handlers ──
 setup_error_handlers(app)
+
+# ── Local Media Files ──
+settings.media_root_path.mkdir(parents=True, exist_ok=True)
+app.mount(
+    settings.media_url_path,
+    StaticFiles(directory=str(settings.media_root_path)),
+    name="media",
+)
 
 
 # ── Health Check ──

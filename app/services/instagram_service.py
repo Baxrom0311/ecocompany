@@ -1,108 +1,137 @@
 """
 ECO COMPANY — Instagram Service
-Token boshqarish va post keshini yangilash
+Instagram videolarini qo'lda link orqali boshqarish.
 """
+import json
 import logging
-from datetime import datetime, timezone
-import httpx
+import re
 from sqlalchemy.orm import Session
-from app.config import settings
-from app.models.instagram import InstagramPost
+from app.models.setting import SiteSetting
 
 logger = logging.getLogger("ecocompany")
 
-GRAPH_API = "https://graph.instagram.com"
+INSTAGRAM_VIDEO_LINKS_KEY = "instagram_video_links"
+INSTAGRAM_LINK_RE = re.compile(
+    r"^https?://(?:www\.)?instagram\.com/(?P<kind>reel|p|tv)/(?P<code>[A-Za-z0-9_-]+)/?(?:\?.*)?$",
+    re.IGNORECASE,
+)
 
 
-async def refresh_long_lived_token() -> dict | None:
-    """
-    Instagram long-lived tokenni yangilash.
-    Har 25 kunda avtomatik (cron) yoki admin panel orqali chaqiriladi.
-    """
+def _normalize_instagram_url(url: str) -> str:
+    normalized = (url or "").strip()
+    if not normalized:
+        raise ValueError("Instagram link bo'sh bo'lmasligi kerak")
+
+    if not normalized.startswith(("http://", "https://")):
+        normalized = f"https://{normalized.lstrip('/')}"
+
+    normalized = normalized.rstrip("/")
+    match = INSTAGRAM_LINK_RE.match(normalized)
+    if not match:
+        raise ValueError("Faqat Instagram reel/post linklari qabul qilinadi")
+
+    kind = match.group("kind").lower()
+    code = match.group("code")
+    return f"https://www.instagram.com/{kind}/{code}/"
+
+
+def _build_video_payload(url: str) -> dict:
+    canonical_url = _normalize_instagram_url(url)
+    match = INSTAGRAM_LINK_RE.match(canonical_url.rstrip("/"))
+    if not match:
+        raise ValueError("Instagram link yaroqsiz")
+
+    kind = match.group("kind").lower()
+    code = match.group("code")
+    return {
+        "id": code,
+        "url": canonical_url,
+        "permalink": canonical_url,
+        "embed_url": f"{canonical_url}embed",
+        "media_type": "VIDEO",
+        "kind": kind,
+    }
+
+
+def _get_links_setting(db: Session) -> SiteSetting | None:
+    return db.query(SiteSetting).filter(SiteSetting.key == INSTAGRAM_VIDEO_LINKS_KEY).first()
+
+
+def get_manual_links(db: Session) -> list[dict]:
+    setting = _get_links_setting(db)
+    if not setting or not setting.value:
+        return []
+
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.get(
-                f"{GRAPH_API}/refresh_access_token",
-                params={
-                    "grant_type": "ig_refresh_token",
-                    "access_token": settings.INSTAGRAM_ACCESS_TOKEN,
-                },
-            )
-            data = response.json()
+        raw_items = json.loads(setting.value)
+    except json.JSONDecodeError:
+        logger.warning("Instagram video linklari JSON emas, bo'sh ro'yxat qaytarildi")
+        return []
 
-            if "access_token" in data:
-                logger.info(f"📸 Instagram token yangilandi, expires_in={data.get('expires_in')} sec")
-                return {
-                    "access_token": data["access_token"],
-                    "expires_in": data.get("expires_in", 5184000),
-                }
-            else:
-                logger.error(f"📸 Instagram token xato: {data}")
-                return None
-    except Exception as e:
-        logger.error(f"📸 Instagram token refresh xato: {e}")
-        return None
+    if not isinstance(raw_items, list):
+        return []
 
+    result: list[dict] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        url = item.get("url") if isinstance(item, dict) else str(item)
+        try:
+            payload = _build_video_payload(url)
+        except ValueError:
+            logger.warning("Instagram link o'tkazib yuborildi: %s", url)
+            continue
 
-async def get_token_status() -> dict:
-    """Token holatini tekshirish"""
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.get(
-                f"{GRAPH_API}/me",
-                params={"access_token": settings.INSTAGRAM_ACCESS_TOKEN},
-            )
-            if response.status_code == 200:
-                return {"is_valid": True, "data": response.json()}
-            else:
-                return {"is_valid": False, "error": response.json()}
-    except Exception as e:
-        return {"is_valid": False, "error": str(e)}
+        if payload["url"] in seen:
+            continue
+        seen.add(payload["url"])
+        result.append(payload)
+
+    return result
 
 
-async def fetch_and_cache_posts(db: Session, limit: int = 25) -> int:
-    """
-    Instagram API dan postlarni olish va DB ga keshga saqlash.
-    Returns: saqlangan post soni.
-    """
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.get(
-                f"{GRAPH_API}/me/media",
-                params={
-                    "fields": "id,media_type,media_url,thumbnail_url,permalink,caption,timestamp",
-                    "limit": limit,
-                    "access_token": settings.INSTAGRAM_ACCESS_TOKEN,
-                },
-            )
-            data = response.json()
+def save_manual_links(db: Session, items: list[dict]) -> list[dict]:
+    normalized_links: list[dict] = []
+    seen: set[str] = set()
 
-        posts = data.get("data", [])
-        if not posts:
-            return 0
+    for item in items:
+        url = item.get("url") if isinstance(item, dict) else None
+        payload = _build_video_payload(url or "")
+        if payload["url"] in seen:
+            continue
+        seen.add(payload["url"])
+        normalized_links.append(payload)
 
-        # Eski keshni tozalash
-        db.query(InstagramPost).delete()
+    value = json.dumps(
+        [{"url": item["url"]} for item in normalized_links],
+        ensure_ascii=False,
+    )
 
-        count = 0
-        for post in posts:
-            ig_post = InstagramPost(
-                instagram_id=post["id"],
-                media_type=post.get("media_type", "IMAGE"),
-                media_url=post.get("media_url"),
-                thumbnail_url=post.get("thumbnail_url"),
-                permalink=post.get("permalink"),
-                caption=post.get("caption"),
-                timestamp=datetime.fromisoformat(post["timestamp"].replace("Z", "+00:00")) if post.get("timestamp") else None,
-                cached_at=datetime.now(timezone.utc),
-            )
-            db.add(ig_post)
-            count += 1
+    setting = _get_links_setting(db)
+    if not setting:
+        setting = SiteSetting(
+            key=INSTAGRAM_VIDEO_LINKS_KEY,
+            value=value,
+            type="json",
+            label="Instagram video linklari",
+            is_public=False,
+        )
+        db.add(setting)
+    else:
+        setting.value = value
+        setting.type = "json"
+        setting.label = "Instagram video linklari"
+        setting.is_public = False
 
-        db.commit()
-        logger.info(f"📸 Instagram: {count} ta post keshga saqlandi")
-        return count
-    except Exception as e:
-        logger.error(f"📸 Instagram fetch xato: {e}")
-        db.rollback()
-        return 0
+    db.commit()
+    db.refresh(setting)
+    return normalized_links
+
+
+def get_manual_status(db: Session) -> dict:
+    links = get_manual_links(db)
+    return {
+        "mode": "manual",
+        "is_configured": len(links) > 0,
+        "link_count": len(links),
+        "message": "Instagram videolari API emas, qo'lda kiritilgan linklar orqali ko'rsatiladi.",
+    }

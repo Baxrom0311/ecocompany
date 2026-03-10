@@ -9,31 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import SessionLocal
-from app.models.user import User
 from app.models.setting import SiteSetting
-from app.utils.hashing import hash_password
-
-
-def seed_admin():
-    """Super admin yaratish"""
-    db = SessionLocal()
-    try:
-        existing = db.query(User).filter(User.email == "admin@ecocompany.uz").first()
-        if existing:
-            print("ℹ️  Admin allaqachon mavjud, o'tkazildi")
-            return
-
-        admin = User(
-            email="admin@ecocompany.uz",
-            password=hash_password("EcoAdmin@2024!"),
-            name="Super Admin",
-            role="super_admin",
-        )
-        db.add(admin)
-        db.commit()
-        print("✅ Super admin yaratildi: admin@ecocompany.uz / EcoAdmin@2024!")
-    finally:
-        db.close()
 
 
 def seed_settings():
@@ -44,14 +20,45 @@ def seed_settings():
             ("phone_1", "+998901234567", "text", "Telefon 1", True),
             ("phone_2", "", "text", "Telefon 2", True),
             ("email", "info@ecocompany.uz", "text", "Email", True),
-            ("address", "Toshkent, O'zbekiston", "text", "Manzil", True),
+            ("address_uz", "Toshkent, O'zbekiston", "text", "Manzil (UZ)", True),
+            ("address_ru", "Ташкент, Узбекистан", "text", "Manzil (RU)", True),
+            ("address_en", "Tashkent, Uzbekistan", "text", "Address (EN)", True),
             ("working_hours", "Du-Ju: 09:00-18:00", "text", "Ish vaqti", True),
+            ("hero_badge", "Premium Tozalangan Suv", "text", "Hero badge", True),
             ("hero_title_uz", "Toza suv — toza hayot", "text", "Hero sarlavha", True),
-            ("hero_desc_uz", "ECO COMPANY — yuqori sifatli tozalangan suv", "text", "Hero tavsif", True),
+            ("hero_title_ru", "Чистая вода — чистая жизнь", "text", "Hero title (RU)", True),
+            ("hero_title_en", "Pure water — pure life", "text", "Hero title (EN)", True),
+            ("hero_subtitle_uz", "ECO COMPANY — yuqori sifatli tozalangan suv", "text", "Hero tavsif (UZ)", True),
+            ("hero_subtitle_ru", "ECO COMPANY — высококачественная очищенная вода", "text", "Hero tavsif (RU)", True),
+            ("hero_subtitle_en", "ECO COMPANY — premium purified water", "text", "Hero subtitle (EN)", True),
+            ("about_page_title_uz", "Kompaniya haqida", "text", "About page title (UZ)", True),
+            ("about_page_title_ru", "О компании", "text", "About page title (RU)", True),
+            ("about_page_title_en", "About Company", "text", "About page title (EN)", True),
+            ("about_section_badge_uz", "Biz haqimizda", "text", "About badge (UZ)", True),
+            ("about_section_badge_ru", "О нас", "text", "About badge (RU)", True),
+            ("about_section_badge_en", "About us", "text", "About badge (EN)", True),
+            ("about_section_title_uz", "Sifatli suv — sog'lom hayot kafolati", "text", "About title (UZ)", True),
+            ("about_section_title_ru", "Качественная вода — залог здоровья", "text", "About title (RU)", True),
+            ("about_section_title_en", "Quality water — guarantee of health", "text", "About title (EN)", True),
+            ("about_text_uz", "ECO COMPANY — O'zbekistondagi sifatli tozalangan suv ishlab chiqaruvchisi.", "text", "Biz haqimizda (UZ)", True),
+            ("about_text_ru", "ECO COMPANY — производитель качественной очищенной воды в Узбекистане.", "text", "Biz haqimizda (RU)", True),
+            ("about_text_en", "ECO COMPANY is a producer of quality purified water in Uzbekistan.", "text", "About us (EN)", True),
+            ("about_values_badge_uz", "Nima uchun biz?", "text", "Values badge (UZ)", True),
+            ("about_values_badge_ru", "Почему мы?", "text", "Values badge (RU)", True),
+            ("about_values_badge_en", "Why us?", "text", "Values badge (EN)", True),
+            ("about_values_title_uz", "Bizning qadriyatlar", "text", "Values title (UZ)", True),
+            ("about_values_title_ru", "Наши ценности", "text", "Values title (RU)", True),
+            ("about_values_title_en", "Our Values", "text", "Values title (EN)", True),
+            ("stats_years", "10", "text", "Yillar tajriba", True),
+            ("stats_clients", "5000", "text", "Mijozlar", True),
+            ("stats_products", "20", "text", "Mahsulotlar", True),
+            ("stats_cities", "15", "text", "Shaharlar", True),
             ("logo_url", "", "image", "Logo", True),
+            ("whatsapp_url", "", "text", "WhatsApp", True),
             ("instagram_url", "https://instagram.com/ecocompany", "text", "Instagram", True),
             ("telegram_url", "https://t.me/ecocompany", "text", "Telegram", True),
             ("facebook_url", "", "text", "Facebook", True),
+            ("youtube_url", "", "text", "YouTube", True),
         ]
 
         count = 0
@@ -69,6 +76,7 @@ def seed_settings():
 
 if __name__ == "__main__":
     print("🌿 ECO COMPANY — Seed boshlandi...")
-    seed_admin()
     seed_settings()
+    print("ℹ️  Admin foydalanuvchi avtomatik yaratilmaydi.")
+    print("ℹ️  Admin yaratish uchun: python scripts/create_admin.py --email admin@ecocompany.uz")
     print("🎉 Seed tugadi!")

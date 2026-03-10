@@ -6,7 +6,7 @@ FastAPI backend for ECO COMPANY website — clean water products & services.
 - **FastAPI** 0.110 + **Uvicorn**
 - **PostgreSQL** + **SQLAlchemy** 2.0 + **Alembic**
 - **JWT** auth (python-jose + bcrypt)
-- **Cloudinary** — file uploads
+- **Local media storage** — file uploads
 - **Anthropic Claude** — AI chatbot
 - **Telegram Bot** — admin notifications
 - **cPanel** deployment (Passenger WSGI)
@@ -24,10 +24,12 @@ pip install -r requirements.txt
 # 3. Environment
 cp .env.example .env
 # Edit .env with real values
+# PUBLIC_BASE_URL ni production backend domeniga qo'ying
 
 # 4. Database
 alembic upgrade head
 python scripts/seed.py
+python scripts/create_admin.py --email admin@ecocompany.uz
 
 # 5. Run
 uvicorn app.main:app --reload
@@ -48,6 +50,7 @@ pip install -r requirements.txt
 cp .env.example .env && nano .env
 alembic upgrade head
 python scripts/seed.py
+python scripts/create_admin.py --email admin@ecocompany.uz
 
 # 3. cPanel → Python App → Restart
 
@@ -70,12 +73,26 @@ python scripts/seed.py
 | Chat | `/api/v1/chat` | AI chatbot |
 | Admin | `/api/v1/admin/*` | Full CRUD for all entities |
 
-## Default Admin
+## Media Storage
+
+- Yuklangan rasm/video/PDF fayllar backend ichidagi `media/` papkasida saqlanadi.
+- API yangi uploadlar uchun `/media/...` URL qaytaradi.
+- Production'da `PUBLIC_BASE_URL` ni backend domeniga sozlang.
+- Deploy paytida `media/` papkasini persistent storage sifatida saqlang.
+
+Eski remote media URL'larni local storage'ga ko'chirish:
+
+```bash
+python scripts/migrate_legacy_media_to_local_storage.py --base-url https://api.ecocompany.uz
+```
+
+## Admin Bootstrap
 
 ```
-Email: admin@ecocompany.uz
-Password: Admin123!
+python scripts/create_admin.py --email admin@ecocompany.uz
 ```
+
+If `--password` berilmasa, skript xavfsiz random parol generatsiya qiladi va uni bir marta terminalga chiqaradi.
 
 ## Project Structure
 

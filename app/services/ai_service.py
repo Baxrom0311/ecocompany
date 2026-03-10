@@ -55,13 +55,19 @@ def _get_system_prompt(db: Session) -> str:
 
     phone = settings_dict.get("phone_1", "")
     email = settings_dict.get("email", "")
+    address = (
+        settings_dict.get("address_uz")
+        or settings_dict.get("address_ru")
+        or settings_dict.get("address_en")
+        or settings_dict.get("address", "")
+    )
 
     return f"""{base_prompt}
 
 KOMPANIYA MA'LUMOTLARI:
 - Telefon: {phone}
 - Email: {email}
-- Manzil: {settings_dict.get('address', '')}
+- Manzil: {address}
 - Ish vaqti: {settings_dict.get('working_hours', '')}
 
 MAHSULOTLAR:

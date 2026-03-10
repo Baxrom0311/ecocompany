@@ -13,8 +13,7 @@ class TestUpload:
         assert resp.status_code in (401, 403)
 
     def test_upload_image_success_and_delete(self, client, admin_headers):
-        # Haqiqiy (lekin judayam kichik - 1x1 qizil piksel) PNG rasm byte lari
-        # Shunda cloudinary haqiqiy fayl deb qabul qiladi
+        # Haqiqiy (lekin juda kichik) PNG byte'lari
         image_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDAT\x08\xd7c\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\x18\xdd\x8d\xb0\x00\x00\x00\x00IEND\xaeB`\x82'
         
         # 1. YUKLASH (Upload)
@@ -27,11 +26,12 @@ class TestUpload:
         assert resp.status_code == 200
         resp_data = resp.json()["data"]
         assert "url" in resp_data
+        assert "/media/" in resp_data["url"]
         
         public_id = resp_data.get("public_id")
         assert public_id is not None
         
-        # 2. O'CHIRISH (Delete - E2E qismi, haqiqiy cloudinarydan tozalash)
+        # 2. O'CHIRISH
         del_resp = client.delete(
             f"/api/v1/admin/upload/{public_id}",
             headers=admin_headers

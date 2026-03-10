@@ -1,9 +1,9 @@
 """
 ECO COMPANY — Certificate Schemas
 """
-from datetime import datetime, date
+from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class CertificateBase(BaseModel):
@@ -14,11 +14,16 @@ class CertificateBase(BaseModel):
     file_type: str = "image"
     preview_url: str | None = None
     issued_by: str | None = None
-    issue_date: date | None = None
-    expiry_date: date | None = None
     is_active: bool = True
-    is_downloadable: bool = False
+    is_downloadable: bool = True
     order_index: int = 0
+
+    @field_validator("file_type")
+    @classmethod
+    def validate_file_type(cls, value: str) -> str:
+        if value != "image":
+            raise ValueError("Faqat rasm sertifikatlar qo'llab-quvvatlanadi")
+        return value
 
 
 class CertificateCreate(CertificateBase):
@@ -33,11 +38,16 @@ class CertificateUpdate(BaseModel):
     file_type: str | None = None
     preview_url: str | None = None
     issued_by: str | None = None
-    issue_date: date | None = None
-    expiry_date: date | None = None
     is_active: bool | None = None
     is_downloadable: bool | None = None
     order_index: int | None = None
+
+    @field_validator("file_type")
+    @classmethod
+    def validate_file_type(cls, value: str | None) -> str | None:
+        if value is not None and value != "image":
+            raise ValueError("Faqat rasm sertifikatlar qo'llab-quvvatlanadi")
+        return value
 
 
 class CertificateResponse(CertificateBase):

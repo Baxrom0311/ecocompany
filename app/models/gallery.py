@@ -52,7 +52,7 @@ class GalleryItem(Base, UUIDMixin, TimestampMixin):
     )
 
     # ── Media ──
-    file_url = Column(String(1000), nullable=False)       # Cloudinary URL
+    file_url = Column(String(1000), nullable=False)       # Media URL
     file_type = Column(String(20), default="image")       # "image" | "video"
     thumbnail_url = Column(String(1000), nullable=True)   # Video uchun preview rasm
     duration_sec = Column(Integer, nullable=True)          # Video uzunligi (sekund)

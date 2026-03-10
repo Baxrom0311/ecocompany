@@ -39,6 +39,7 @@ async def create_user(
         password=hash_password(data.password),
         name=data.name,
         role=data.role,
+        is_active=data.is_active,
     )
     db.add(user)
     db.flush()

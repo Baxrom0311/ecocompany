@@ -19,6 +19,7 @@ class UserCreate(BaseModel):
     password: str
     name: str
     role: str = "editor"
+    is_active: bool = True
 
     @field_validator("password")
     @classmethod

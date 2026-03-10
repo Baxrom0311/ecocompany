@@ -58,6 +58,16 @@ class TestPublicProducts:
         resp = client.get("/api/v1/products?is_on_sale=true")
         assert resp.json()["data"]["total"] == 1
 
+    def test_search_matches_across_catalog(self, client, db):
+        db.add(Product(name_uz="Toza suv 1L", is_active=True))
+        db.add(Product(name_uz="Mineral suv", name_ru="Минеральная вода", is_active=True))
+        db.add(Product(name_uz="Filtr", is_active=True))
+        db.commit()
+
+        resp = client.get("/api/v1/products?search=suv")
+        assert resp.status_code == 200
+        assert resp.json()["data"]["total"] == 2
+
     def test_featured_products(self, client, db):
         db.add(Product(name_uz="Featured 1", is_active=True, is_featured=True))
         db.add(Product(name_uz="Featured 2", is_active=True, is_featured=True))

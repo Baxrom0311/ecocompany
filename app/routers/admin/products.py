@@ -11,6 +11,7 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.utils.pagination import paginate
 from app.services.audit_service import log_action
+from app.services import storage_service
 
 router = APIRouter()
 
@@ -22,6 +23,7 @@ async def list_products(
     search: str | None = None,
     category_id: UUID | None = None,
     is_active: bool | None = None,
+    is_on_sale: bool | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -35,6 +37,8 @@ async def list_products(
         query = query.filter(Product.category_id == category_id)
     if is_active is not None:
         query = query.filter(Product.is_active == is_active)
+    if is_on_sale is not None:
+        query = query.filter(Product.is_on_sale == is_on_sale)
 
     query = query.order_by(Product.order_index.asc())
     result = paginate(query, page, per_page)
@@ -81,6 +85,7 @@ async def update_product(
     if not product:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
 
+    previous_images = list(product.images or [])
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(product, key, value)
@@ -89,6 +94,10 @@ async def update_product(
     log_action(db, current_user.id, "update", "product", product.id, changes=changes_json, ip_address=request.client.host if request.client else None)
     db.commit()
     db.refresh(product)
+    next_images = list(product.images or [])
+    await storage_service.delete_files_by_urls(
+        [url for url in previous_images if url and url not in next_images]
+    )
     return {"success": True, "data": ProductResponse.model_validate(product)}
 
 
@@ -104,9 +113,11 @@ async def delete_product(
     if not product:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
 
+    previous_images = list(product.images or [])
     log_action(db, current_user.id, "delete", "product", product.id, ip_address=request.client.host if request.client else None)
     db.delete(product)
     db.commit()
+    await storage_service.delete_files_by_urls(previous_images)
     return {"success": True, "message": "Mahsulot o'chirildi"}
 
 

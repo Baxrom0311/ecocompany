@@ -13,6 +13,7 @@ from app.schemas.gallery import (
 )
 from app.dependencies.auth import get_current_user
 from app.models.user import User
+from app.services import storage_service
 
 router = APIRouter()
 
@@ -70,8 +71,12 @@ async def delete_album(
     if not album:
         raise HTTPException(status_code=404, detail="Album topilmadi")
 
+    previous_urls = []
+    for item in album.items:
+        previous_urls.extend([item.file_url, item.thumbnail_url])
     db.delete(album)  # CASCADE — items ham o'chiriladi
     db.commit()
+    await storage_service.delete_files_by_urls(previous_urls)
     return {"success": True, "message": "Album va barcha elementlari o'chirildi"}
 
 
@@ -109,11 +114,15 @@ async def update_item(
     if not item:
         raise HTTPException(status_code=404, detail="Element topilmadi")
 
+    previous_urls = [item.file_url, item.thumbnail_url]
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(item, key, value)
 
     db.commit()
     db.refresh(item)
+    await storage_service.delete_files_by_urls(
+        [url for url in previous_urls if url and url not in {item.file_url, item.thumbnail_url}]
+    )
     return {"success": True, "data": GalleryItemResponse.model_validate(item)}
 
 
@@ -130,8 +139,10 @@ async def delete_item(
     if not item:
         raise HTTPException(status_code=404, detail="Element topilmadi")
 
+    previous_urls = [item.file_url, item.thumbnail_url]
     db.delete(item)
     db.commit()
+    await storage_service.delete_files_by_urls(previous_urls)
     return {"success": True, "message": "Element o'chirildi"}
 
 

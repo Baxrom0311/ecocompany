@@ -2,6 +2,7 @@
 ECO COMPANY — Application Configuration
 Pydantic Settings orqali .env fayldan sozlamalarni o'qish
 """
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
@@ -31,10 +32,10 @@ class Settings(BaseSettings):
     # ── AI (Claude) ──
     ANTHROPIC_API_KEY: str = ""
 
-    # ── Cloudinary ──
-    CLOUDINARY_CLOUD_NAME: str = ""
-    CLOUDINARY_API_KEY: str = ""
-    CLOUDINARY_API_SECRET: str = ""
+    # ── Media Storage ──
+    MEDIA_ROOT: str = "media"
+    MEDIA_URL_PATH: str = "/media"
+    PUBLIC_BASE_URL: str = ""
 
     # ── Instagram ──
     INSTAGRAM_ACCESS_TOKEN: str = ""
@@ -63,10 +64,25 @@ class Settings(BaseSettings):
             return []
         return [cid.strip() for cid in self.TELEGRAM_CHAT_IDS.split(",")]
 
+    @property
+    def media_root_path(self) -> Path:
+        """Media fayllar saqlanadigan absolut papka."""
+        media_root = Path(self.MEDIA_ROOT)
+        if media_root.is_absolute():
+            return media_root
+        return Path(__file__).resolve().parents[1] / media_root
+
+    @property
+    def media_url_path(self) -> str:
+        """Media URL prefixi doim slash bilan boshlansin."""
+        path = self.MEDIA_URL_PATH.strip() or "/media"
+        return path if path.startswith("/") else f"/{path}"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
+        extra="ignore",
     )
 
 

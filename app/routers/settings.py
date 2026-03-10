@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.setting import SiteSetting
+from app.utils.site_settings import is_excluded_from_public
 
 router = APIRouter()
 
@@ -19,5 +20,9 @@ async def get_public_settings(db: Session = Depends(get_db)):
 
     return {
         "success": True,
-        "data": {s.key: s.value for s in settings},
+        "data": {
+            s.key: s.value
+            for s in settings
+            if not is_excluded_from_public(s.key)
+        },
     }
