@@ -69,6 +69,12 @@ async def update_user(
         if existing:
             raise HTTPException(status_code=409, detail="Bu email allaqachon mavjud")
 
+    if str(user_id) == str(current_user.id):
+        if update_data.get("role") and update_data["role"] != "super_admin":
+            raise HTTPException(status_code=400, detail="O'zingizni super_admin rolidan tushira olmaysiz")
+        if update_data.get("is_active") is False:
+            raise HTTPException(status_code=400, detail="O'zingizni deaktiv qila olmaysiz")
+
     for key, value in update_data.items():
         setattr(user, key, value)
 

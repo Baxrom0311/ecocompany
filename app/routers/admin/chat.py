@@ -126,7 +126,7 @@ PROMPT_SETTING_KEY = "ai_system_prompt"
 @router.get("/prompt")
 async def get_system_prompt(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_super_admin),
 ):
     """Joriy AI system promptni ko'rish"""
     setting = db.query(SiteSetting).filter(SiteSetting.key == PROMPT_SETTING_KEY).first()

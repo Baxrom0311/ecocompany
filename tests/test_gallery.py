@@ -113,6 +113,37 @@ class TestPublicGallery:
         resp = client.get("/api/v1/gallery/albums?category=production")
         assert len(resp.json()["data"]) == 1
 
+    def test_albums_include_cover_metadata(self, client, db):
+        album = GalleryAlbum(title_uz="Fabrika", is_active=True)
+        db.add(album)
+        db.commit()
+        db.refresh(album)
+
+        db.add(GalleryItem(
+            album_id=album.id,
+            file_url="https://x.com/video.mp4",
+            thumbnail_url="https://x.com/video-thumb.jpg",
+            file_type="video",
+            is_active=True,
+        ))
+        db.add(GalleryItem(
+            album_id=album.id,
+            file_url="https://x.com/hidden.jpg",
+            file_type="image",
+            is_active=False,
+        ))
+        db.commit()
+
+        resp = client.get("/api/v1/gallery/albums")
+        assert resp.status_code == 200
+        data = resp.json()["data"][0]
+        assert data["items_count"] == 1
+        assert data["cover_url"] == "https://x.com/video.mp4"
+        assert data["cover_thumbnail_url"] == "https://x.com/video-thumb.jpg"
+        assert data["cover_file_type"] == "video"
+        assert len(data["preview_items"]) == 1
+        assert data["preview_items"][0]["file_url"] == "https://x.com/video.mp4"
+
 
 class TestAdminGallery:
     def test_create_album(self, client, admin_headers):

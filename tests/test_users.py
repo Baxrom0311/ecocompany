@@ -66,6 +66,18 @@ class TestAdminUsers:
         })
         assert resp.status_code == 404
 
+    def test_update_self_role_downgrade_prevented(self, client, admin_headers, admin_user):
+        resp = client.put(f"/api/v1/admin/users/{admin_user.id}", headers=admin_headers, json={
+            "role": "editor",
+        })
+        assert resp.status_code == 400
+
+    def test_update_self_deactivate_prevented(self, client, admin_headers, admin_user):
+        resp = client.put(f"/api/v1/admin/users/{admin_user.id}", headers=admin_headers, json={
+            "is_active": False,
+        })
+        assert resp.status_code == 400
+
     def test_delete(self, client, admin_headers, db):
         user = User(email="del@test.com", password=hash_password("Test123!"), name="Del", role="editor")
         db.add(user)

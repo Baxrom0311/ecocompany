@@ -73,5 +73,5 @@ async def delete_uploaded(
     """Serverdagi media faylni o'chirish"""
     deleted = await storage_service.delete_file(public_id)
     if not deleted:
-        return {"success": True, "message": "Fayl topilmadi yoki oldin o'chirilgan"}
+        raise HTTPException(status_code=404, detail="Fayl topilmadi yoki allaqachon o'chirilgan")
     return {"success": True, "message": "Fayl o'chirildi"}

@@ -82,5 +82,9 @@ class GalleryAlbumListResponse(GalleryAlbumBase):
     id: UUID
     created_at: datetime
     items_count: int = 0
+    cover_url: str | None = None
+    cover_thumbnail_url: str | None = None
+    cover_file_type: str | None = None
+    preview_items: list[GalleryItemResponse] = []
 
     model_config = {"from_attributes": True}

@@ -62,7 +62,7 @@ class TestUpload:
     def test_delete_file_failed(self, client, admin_headers):
         # Mavjud bo'lmagan public_id bilan o'chirishga urinish
         resp = client.delete("/api/v1/admin/upload/ecocompany_test_nonexistent", headers=admin_headers)
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     def test_delete_unauthenticated(self, client):
         resp = client.delete("/api/v1/admin/upload/test123")

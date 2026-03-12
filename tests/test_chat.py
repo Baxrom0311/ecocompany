@@ -2,6 +2,7 @@
 Test Chat Router — AI chatbot endpoint
 """
 from unittest.mock import patch, AsyncMock
+from app.models.setting import SiteSetting
 
 
 class TestChatRouter:
@@ -53,3 +54,20 @@ class TestChatRouter:
         })
         # 500 yoki graceful error
         assert resp.status_code in (200, 500)
+
+
+class TestAdminChatPrompt:
+    def test_super_admin_can_read_prompt(self, client, admin_headers, db):
+        db.add(SiteSetting(key="ai_system_prompt", value="Secret prompt", is_public=False))
+        db.commit()
+
+        resp = client.get("/api/v1/admin/chat/prompt", headers=admin_headers)
+        assert resp.status_code == 200
+        assert resp.json()["data"]["prompt"] == "Secret prompt"
+
+    def test_editor_cannot_read_prompt(self, client, editor_headers, db):
+        db.add(SiteSetting(key="ai_system_prompt", value="Secret prompt", is_public=False))
+        db.commit()
+
+        resp = client.get("/api/v1/admin/chat/prompt", headers=editor_headers)
+        assert resp.status_code == 403
