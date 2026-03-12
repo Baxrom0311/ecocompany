@@ -2,6 +2,7 @@ from app.config import settings
 from app.models.certificate import Certificate
 from app.models.gallery import GalleryAlbum, GalleryItem
 from app.models.product import Product
+from app.models.setting import SiteSetting
 
 
 class TestSEORoutes:
@@ -21,6 +22,21 @@ class TestSEORoutes:
         assert "/sitemaps/pages.xml" in response.text
         assert "/sitemaps/products.xml" in response.text
         assert "/sitemaps/media.xml" in response.text
+
+    def test_pages_sitemap_uses_dynamic_images_and_lastmod(self, client, db, monkeypatch):
+        monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "")
+        db.add(SiteSetting(key="hero_image_url", value="http://testserver/media/settings/hero.jpg", is_public=True))
+        db.add(SiteSetting(key="logo_url", value="http://testserver/media/settings/logo.png", is_public=True))
+        db.add(Product(name_uz="Premium suv", images=["http://testserver/media/products/suv-1.jpg"], is_active=True))
+        db.commit()
+
+        response = client.get("/sitemaps/pages.xml")
+
+        assert response.status_code == 200
+        assert "/products" in response.text
+        assert "http://testserver/media/settings/hero.jpg" in response.text
+        assert "http://testserver/media/settings/logo.png" in response.text
+        assert "<image:image>" in response.text
 
     def test_products_sitemap_contains_product_urls_and_images(self, client, db, monkeypatch):
         monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "")

@@ -12,17 +12,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.database import SessionLocal
 from app.models.setting import SiteSetting
 
-DEFAULT_PARTNER_LOGOS = [
-    "/media/partners/NGMK.jpg",
-    "/media/partners/MININNOVATION.jpg",
-    "/media/partners/UZAVTO.jpg",
-    "/media/partners/ONA.jpg",
-    "/media/partners/ICHF.jpg",
-    "/media/partners/NBU.jpg",
-    "/media/partners/URSU.jpg",
-]
-
-
 def seed_settings():
     """Boshlang'ich sozlamalar"""
     db = SessionLocal()
@@ -72,6 +61,27 @@ def seed_settings():
             ("facebook_url", "", "text", "Facebook", True),
             ("youtube_url", "", "text", "YouTube", True),
             ("partner_logos", json.dumps([]), "json", "Hamkor logolari", True),
+            ("seo_keywords_uz", "eco company, tozalangan suv, ichimlik suvi, suv filtrlari, suv tozalash uskunalari", "text", "SEO kalit so'zlar (UZ)", True),
+            ("seo_keywords_ru", "eco company, очищенная вода, питьевая вода, фильтры для воды, оборудование для очистки воды", "text", "SEO kalit so'zlar (RU)", True),
+            ("seo_keywords_en", "eco company, purified water, drinking water, water filters, water treatment equipment", "text", "SEO keywords (EN)", True),
+            ("seo_home_keywords_uz", "", "text", "Home SEO kalit so'zlar (UZ)", True),
+            ("seo_home_keywords_ru", "", "text", "Home SEO kalit so'zlar (RU)", True),
+            ("seo_home_keywords_en", "", "text", "Home SEO keywords (EN)", True),
+            ("seo_products_keywords_uz", "", "text", "Products SEO kalit so'zlar (UZ)", True),
+            ("seo_products_keywords_ru", "", "text", "Products SEO kalit so'zlar (RU)", True),
+            ("seo_products_keywords_en", "", "text", "Products SEO keywords (EN)", True),
+            ("seo_about_keywords_uz", "", "text", "About SEO kalit so'zlar (UZ)", True),
+            ("seo_about_keywords_ru", "", "text", "About SEO kalit so'zlar (RU)", True),
+            ("seo_about_keywords_en", "", "text", "About SEO keywords (EN)", True),
+            ("seo_gallery_keywords_uz", "", "text", "Gallery SEO kalit so'zlar (UZ)", True),
+            ("seo_gallery_keywords_ru", "", "text", "Gallery SEO kalit so'zlar (RU)", True),
+            ("seo_gallery_keywords_en", "", "text", "Gallery SEO keywords (EN)", True),
+            ("seo_certificates_keywords_uz", "", "text", "Certificates SEO kalit so'zlar (UZ)", True),
+            ("seo_certificates_keywords_ru", "", "text", "Certificates SEO kalit so'zlar (RU)", True),
+            ("seo_certificates_keywords_en", "", "text", "Certificates SEO keywords (EN)", True),
+            ("seo_contact_keywords_uz", "", "text", "Contact SEO kalit so'zlar (UZ)", True),
+            ("seo_contact_keywords_ru", "", "text", "Contact SEO kalit so'zlar (RU)", True),
+            ("seo_contact_keywords_en", "", "text", "Contact SEO keywords (EN)", True),
         ]
 
         count = 0

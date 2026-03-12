@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models.certificate import Certificate
 from app.models.gallery import GalleryAlbum, GalleryItem
 from app.models.product import Product
+from app.models.setting import SiteSetting
 
 router = APIRouter(include_in_schema=False)
 
@@ -80,6 +81,27 @@ def _render_url_entry(
     return "\n".join(parts)
 
 
+def _settings_map(db: Session) -> dict[str, SiteSetting]:
+    settings_rows = db.query(SiteSetting).filter(SiteSetting.is_public == True).all()
+    return {setting.key: setting for setting in settings_rows}
+
+
+def _setting_value(settings_map: dict[str, SiteSetting], key: str) -> str | None:
+    setting = settings_map.get(key)
+    return setting.value if setting and setting.value else None
+
+
+def _page_images(*items: tuple[str | None, str | None, str | None]) -> list[dict[str, str | None]]:
+    seen = set()
+    result: list[dict[str, str | None]] = []
+    for loc, title, caption in items:
+        if not loc or loc in seen:
+            continue
+        seen.add(loc)
+        result.append({"loc": loc, "title": title, "caption": caption})
+    return result
+
+
 def _sitemap_index(base_url: str) -> str:
     today = date.today().isoformat()
     urls = [
@@ -125,17 +147,103 @@ async def sitemap_index(request: Request):
 
 
 @router.api_route("/sitemaps/pages.xml", methods=["GET", "HEAD"])
-async def pages_sitemap(request: Request):
+async def pages_sitemap(request: Request, db: Session = Depends(get_db)):
     base_url = _public_site_url(request)
-    entries = [
-        _render_url_entry(f"{base_url}/", changefreq="weekly", priority="1.0"),
-        _render_url_entry(f"{base_url}/products", changefreq="daily", priority="0.9"),
-        _render_url_entry(f"{base_url}/about", changefreq="monthly", priority="0.8"),
-        _render_url_entry(f"{base_url}/certificates", changefreq="weekly", priority="0.8"),
-        _render_url_entry(f"{base_url}/gallery", changefreq="weekly", priority="0.8"),
-        _render_url_entry(f"{base_url}/contact", changefreq="monthly", priority="0.7"),
+    settings_map = _settings_map(db)
+    hero_image = _setting_value(settings_map, "hero_image_url")
+    logo_image = _setting_value(settings_map, "logo_url")
+    settings_lastmod = _format_lastmod(
+        max((setting.updated_at for setting in settings_map.values()), default=None)
+    )
+    latest_product = (
+        db.query(Product)
+        .filter(Product.is_active == True)
+        .order_by(Product.updated_at.desc().nullslast(), Product.created_at.desc())
+        .first()
+    )
+    latest_certificate = (
+        db.query(Certificate)
+        .filter(Certificate.is_active == True)
+        .order_by(Certificate.updated_at.desc().nullslast(), Certificate.created_at.desc())
+        .first()
+    )
+    latest_gallery_album = (
+        db.query(GalleryAlbum)
+        .filter(GalleryAlbum.is_active == True)
+        .order_by(GalleryAlbum.updated_at.desc().nullslast(), GalleryAlbum.created_at.desc())
+        .first()
+    )
+    latest_gallery_item = (
+        db.query(GalleryItem)
+        .filter(GalleryItem.is_active == True)
+        .order_by(GalleryItem.updated_at.desc().nullslast(), GalleryItem.created_at.desc())
+        .first()
+    )
+    products_image = (latest_product.images or [None])[0] if latest_product and latest_product.images else None
+    certificates_image = latest_certificate.preview_url or latest_certificate.file_url if latest_certificate else None
+    gallery_image = (
+        latest_gallery_item.thumbnail_url or latest_gallery_item.file_url
+        if latest_gallery_item else None
+    )
+    gallery_lastmod_source = [
+        value for value in [
+            latest_gallery_album.updated_at if latest_gallery_album else None,
+            latest_gallery_album.created_at if latest_gallery_album else None,
+            latest_gallery_item.updated_at if latest_gallery_item else None,
+            latest_gallery_item.created_at if latest_gallery_item else None,
+        ] if value is not None
     ]
-    return _xml_response(_render_urlset(entries), "application/xml; charset=utf-8")
+    entries = [
+        _render_url_entry(
+            f"{base_url}/",
+            lastmod=settings_lastmod,
+            changefreq="weekly",
+            priority="1.0",
+            images=_page_images(
+                (hero_image, "ECO COMPANY hero", "Hero banner"),
+                (logo_image, "ECO COMPANY logo", "Brand logo"),
+            ),
+        ),
+        _render_url_entry(
+            f"{base_url}/products",
+            lastmod=_format_lastmod(latest_product.updated_at or latest_product.created_at) if latest_product else None,
+            changefreq="daily",
+            priority="0.9",
+            images=_page_images((products_image, "ECO COMPANY products", "Product catalog")),
+        ),
+        _render_url_entry(
+            f"{base_url}/about",
+            lastmod=settings_lastmod,
+            changefreq="monthly",
+            priority="0.8",
+            images=_page_images((hero_image, "About ECO COMPANY", "About page image")),
+        ),
+        _render_url_entry(
+            f"{base_url}/certificates",
+            lastmod=_format_lastmod(latest_certificate.updated_at or latest_certificate.created_at) if latest_certificate else None,
+            changefreq="weekly",
+            priority="0.8",
+            images=_page_images((certificates_image, "ECO COMPANY certificates", "Certificates preview")),
+        ),
+        _render_url_entry(
+            f"{base_url}/gallery",
+            lastmod=_format_lastmod(max(gallery_lastmod_source, default=None)),
+            changefreq="weekly",
+            priority="0.8",
+            images=_page_images((gallery_image, "ECO COMPANY gallery", "Gallery preview")),
+        ),
+        _render_url_entry(
+            f"{base_url}/contact",
+            lastmod=settings_lastmod,
+            changefreq="monthly",
+            priority="0.7",
+            images=_page_images(
+                (logo_image, "ECO COMPANY contact", "Contact page brand"),
+                (hero_image, "ECO COMPANY contact", "Contact page hero"),
+            ),
+        ),
+    ]
+    return _xml_response(_render_urlset(entries, image_namespace=True), "application/xml; charset=utf-8")
 
 
 @router.api_route("/sitemaps/products.xml", methods=["GET", "HEAD"])
