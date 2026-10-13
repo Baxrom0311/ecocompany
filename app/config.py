@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     PUBLIC_BASE_URL: str = ""
     SITE_URL: str = ""
 
+    # ── Storage Backend ──
+    STORAGE_BACKEND: str = "local"  # "local" yoki "r2"
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET_NAME: str = ""
+    R2_PUBLIC_URL: str = ""  # R2 public URL (custom domain yoki r2.dev URL)
+
     # ── Instagram ──
     INSTAGRAM_ACCESS_TOKEN: str = ""
     INSTAGRAM_USER_ID: str = ""
@@ -82,6 +90,11 @@ class Settings(BaseSettings):
         """Media URL prefixi doim slash bilan boshlansin."""
         path = self.MEDIA_URL_PATH.strip() or "/media"
         return path if path.startswith("/") else f"/{path}"
+
+    @property
+    def is_r2_backend(self) -> bool:
+        """STORAGE_BACKEND r2 ga o'rnatilgan bo'lsa True."""
+        return self.STORAGE_BACKEND.lower() == "r2"
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -32,9 +32,11 @@ async def lifespan(app: FastAPI):
     """Startup va shutdown events"""
     # STARTUP
     setup_logging()
-    settings.media_root_path.mkdir(parents=True, exist_ok=True)
+    if not settings.is_r2_backend:
+        settings.media_root_path.mkdir(parents=True, exist_ok=True)
     logger.info("🌿 ECO COMPANY Backend ishga tushdi")
     logger.info(f"📌 Environment: {settings.ENVIRONMENT}")
+    logger.info(f"📦 Storage backend: {settings.STORAGE_BACKEND}")
 
     # Import all models so Base.metadata knows about them
     from app.models import user, category, product, certificate  # noqa
@@ -92,13 +94,14 @@ app.add_middleware(LoggingMiddleware)
 # ── Error Handlers ──
 setup_error_handlers(app)
 
-# ── Local Media Files ──
-settings.media_root_path.mkdir(parents=True, exist_ok=True)
-app.mount(
-    settings.media_url_path,
-    StaticFiles(directory=str(settings.media_root_path)),
-    name="media",
-)
+# ── Local Media Files (faqat local storage uchun) ──
+if not settings.is_r2_backend:
+    settings.media_root_path.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        settings.media_url_path,
+        StaticFiles(directory=str(settings.media_root_path)),
+        name="media",
+    )
 app.mount(
     "/api/v1/mcp",
     mcp_app,

@@ -1,10 +1,14 @@
 """
-ECO COMPANY — Local Storage Service
-Media fayllarni serverdagi papkaga saqlash/o'chirish
+ECO COMPANY — Storage Service (Abstraktsiya)
+STORAGE_BACKEND=local → local filesystem
+STORAGE_BACKEND=r2    → Cloudflare R2
+
+Barcha tashqi interfeys o'zgarmaydi:
+  upload_bytes, upload_file, delete_file, delete_file_by_url,
+  delete_files_by_urls, is_media_referenced, build_file_url, extract_public_id
 """
 import asyncio
 import json
-from sqlalchemy.orm import Session
 import re
 import uuid
 from pathlib import Path
@@ -12,12 +16,17 @@ from urllib.parse import urljoin, urlparse, unquote
 from collections.abc import Iterable
 
 from fastapi import UploadFile
+from sqlalchemy.orm import Session
 
 from app.config import settings
 
 _SAFE_PART_RE = re.compile(r"[^a-zA-Z0-9_-]+")
 _SAFE_EXT_RE = re.compile(r"[^a-zA-Z0-9.]")
 
+
+# ────────────────────────────────────────────────────────────
+# LOCAL helpers (unchanged from original)
+# ────────────────────────────────────────────────────────────
 
 def _media_root() -> Path:
     root = settings.media_root_path
@@ -58,7 +67,16 @@ def _resolve_relative_path(public_id: str) -> Path | None:
     return resolved
 
 
+# ────────────────────────────────────────────────────────────
+# PUBLIC INTERFACE — URL helpers
+# ────────────────────────────────────────────────────────────
+
 def build_file_url(public_id: str, base_url: str | None = None) -> str:
+    """public_id dan to'liq URL qurish (backend ga bog'liq)."""
+    if settings.is_r2_backend:
+        from app.services import r2_service
+        return r2_service.build_r2_url(public_id)
+
     media_path = f"{settings.media_url_path.rstrip('/')}/{public_id.lstrip('/')}"
     public_base = (settings.PUBLIC_BASE_URL or "").strip()
     if public_base:
@@ -69,7 +87,7 @@ def build_file_url(public_id: str, base_url: str | None = None) -> str:
 
 
 def extract_public_id(file_url: str | None) -> str | None:
-    """Local media URL dan storage public_id ni ajratib olish."""
+    """URL dan storage public_id (yoki R2 key) ni ajratib olish."""
     if not file_url:
         return None
 
@@ -77,6 +95,13 @@ def extract_public_id(file_url: str | None) -> str | None:
     if not raw_url:
         return None
 
+    if settings.is_r2_backend:
+        from app.services import r2_service
+        key = r2_service.extract_r2_key(raw_url)
+        if key:
+            return key
+
+    # ── Local ──
     try:
         parsed = urlparse(raw_url)
         if parsed.netloc and settings.PUBLIC_BASE_URL and parsed.netloc != urlparse(settings.PUBLIC_BASE_URL).netloc:
@@ -93,8 +118,12 @@ def extract_public_id(file_url: str | None) -> str | None:
     return public_id or None
 
 
+# ────────────────────────────────────────────────────────────
+# PUBLIC INTERFACE — upload
+# ────────────────────────────────────────────────────────────
+
 async def upload_file(file: UploadFile, folder: str = "ecocompany", base_url: str | None = None) -> dict:
-    """UploadFile obyektini local media papkaga saqlash."""
+    """UploadFile obyektini storage ga saqlash."""
     contents = await file.read()
     return await upload_bytes(
         data=contents,
@@ -110,7 +139,12 @@ async def upload_bytes(
     filename: str = "",
     base_url: str | None = None,
 ) -> dict:
-    """Bytes ko'rinishidagi faylni local media papkaga saqlash."""
+    """Bytes ko'rinishidagi faylni storage ga saqlash."""
+    if settings.is_r2_backend:
+        from app.services import r2_service
+        return await r2_service.upload_bytes(data=data, folder=folder, filename=filename, base_url=base_url)
+
+    # ── Local ──
     target_dir = _media_root() / _sanitize_folder(folder)
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -127,8 +161,17 @@ async def upload_bytes(
     }
 
 
+# ────────────────────────────────────────────────────────────
+# PUBLIC INTERFACE — delete
+# ────────────────────────────────────────────────────────────
+
 async def delete_file(public_id: str) -> bool:
-    """Local media papkadagi faylni o'chirish."""
+    """Storage dan faylni public_id/key bo'yicha o'chirish."""
+    if settings.is_r2_backend:
+        from app.services import r2_service
+        return await r2_service.delete_file(public_id)
+
+    # ── Local ──
     target = _resolve_relative_path(public_id)
     if target is None or not target.exists() or not target.is_file():
         return False
@@ -148,7 +191,7 @@ async def delete_file(public_id: str) -> bool:
 
 
 async def delete_file_by_url(file_url: str | None, db: Session | None = None) -> bool:
-    """Local media URL bo'yicha faylni o'chirish."""
+    """URL bo'yicha faylni o'chirish (agar boshqa joylarda ishlatilmasa)."""
     public_id = extract_public_id(file_url)
     if not public_id or (db is not None and is_media_referenced(public_id, db)):
         return False
@@ -156,7 +199,7 @@ async def delete_file_by_url(file_url: str | None, db: Session | None = None) ->
 
 
 async def delete_files_by_urls(urls: Iterable[str | None], db: Session | None = None) -> None:
-    """Bir nechta local media URL larni xavfsiz o'chirish."""
+    """Bir nechta URL larni xavfsiz o'chirish."""
     seen: set[str] = set()
     for url in urls:
         public_id = extract_public_id(url)
@@ -167,15 +210,24 @@ async def delete_files_by_urls(urls: Iterable[str | None], db: Session | None = 
             await delete_file(public_id)
 
 
+# ────────────────────────────────────────────────────────────
+# Fix P1-B: is_media_referenced — PostgreSQL optimized
+# ────────────────────────────────────────────────────────────
+
 def is_media_referenced(public_id: str, db: Session) -> bool:
-    """Preserve shared media, including URLs embedded in JSON site settings."""
+    """Preserve shared media, including URLs embedded in JSON site settings.
+
+    PostgreSQL optimizatsiyasi: public_id ni SQL LIKE filtr sifatida qo'llaydi,
+    shunda katta bazalarda ham to'liq scan qilinmaydi. yield_per saqlanadi.
+    """
     from app.models.product import Product
     from app.models.gallery import GalleryItem
     from app.models.certificate import Certificate
     from app.models.category import Category
     from app.models.setting import SiteSetting
+    import sqlalchemy as sa
 
-    def matches(value):
+    def matches(value) -> bool:
         if isinstance(value, str):
             if extract_public_id(value) == public_id:
                 return True
@@ -190,6 +242,9 @@ def is_media_referenced(public_id: str, db: Session) -> bool:
             return any(matches(item) for item in value.values())
         return False
 
+    # Qidiruv satri — URL yoki public_id fragmentini o'z ichiga oladi
+    search_fragment = public_id.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
     for model, columns in (
         (Product, (Product.images,)),
         (GalleryItem, (GalleryItem.file_url, GalleryItem.thumbnail_url)),
@@ -197,7 +252,15 @@ def is_media_referenced(public_id: str, db: Session) -> bool:
         (Category, (Category.icon,)),
         (SiteSetting, (SiteSetting.value,)),
     ):
-        for row in db.query(*columns).yield_per(200):
+        # Har bir ustun uchun LIKE filtr qo'llaymiz — katta DB da N ta qator o'rniga
+        # faqat mos keluvchilar yuklanadi
+        like_filters = [
+            sa.cast(col, sa.Text).like(f"%{search_fragment}%", escape="\\")
+            for col in columns
+        ]
+        query = db.query(*columns).filter(sa.or_(*like_filters)).yield_per(200)
+        for row in query:
             if any(matches(value) for value in row):
                 return True
+
     return False

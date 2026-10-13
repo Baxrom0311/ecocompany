@@ -1,8 +1,11 @@
 """Run ASGI lifespan on the same loop as Passenger's HTTP requests."""
 import asyncio
+import logging
 import threading
 
 from a2wsgi import ASGIMiddleware
+
+logger = logging.getLogger("ecocompany.wsgi")
 
 
 class LifespanWSGI:
@@ -22,6 +25,12 @@ class LifespanWSGI:
                 self._ready.set()
                 await self._stop.wait()
         except BaseException as exc:
+            logger.critical(
+                "Application lifespan startup xatosi: %s: %s",
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
             self._error = exc
             self._ready.set()
             raise
@@ -31,9 +40,11 @@ class LifespanWSGI:
             if self._future is None:
                 self._future = asyncio.run_coroutine_threadsafe(self._serve_lifespan(), self.adapter.loop)
         if not self._ready.wait(timeout=60):
-            raise RuntimeError("Application startup timed out")
+            raise RuntimeError("Application startup timed out (60s)")
         if self._error is not None:
-            raise RuntimeError("Application startup failed") from self._error
+            raise RuntimeError(
+                f"Application startup failed — {type(self._error).__name__}: {self._error}"
+            ) from self._error
         return self.adapter(environ, start_response)
 
     def close(self):

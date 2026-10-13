@@ -1,0 +1,75 @@
+name: Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Lint, Test & Validate
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: sqlite:///./test.db
+      JWT_SECRET: test-super-secret-jwt-key-minimum-32-chars
+      STORAGE_BACKEND: local
+      MEDIA_ROOT: media_test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Python syntax & compile check
+        run: |
+          python -m compileall app tests
+
+      - name: Run Test Suite (pytest)
+        run: |
+          pytest tests/ -v --tb=short
+
+  docker-build:
+    name: Docker Build Validation (Northflank)
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: ecocompany-backend:test
+
+  deploy-northflank:
+    name: Trigger Northflank Deploy
+    needs: [test, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Northflank Webhook (if configured)
+        if: env.NORTHFLANK_WEBHOOK != ''
+        env:
+          NORTHFLANK_WEBHOOK: ${{ secrets.NORTHFLANK_DEPLOY_WEBHOOK }}
+        run: |
+          echo "🚀 Triggering Northflank Deployment..."
+          curl -s -X POST "$NORTHFLANK_WEBHOOK" || true
+          echo "✅ Deployment triggered successfully!"

@@ -6,9 +6,12 @@ import bcrypt
 
 
 def hash_password(password: str) -> str:
-    """Parolni bcrypt bilan hashlash"""
+    """Parolni bcrypt bilan hashlash (max 72 bayt UTF-8)"""
+    encoded = password.encode("utf-8")
+    if len(encoded) > 72:
+        raise ValueError("Parol juda uzun (max 72 bayt)")
     salt = bcrypt.gensalt(rounds=12)
-    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    hashed = bcrypt.hashpw(encoded, salt)
     return hashed.decode("utf-8")
 
 

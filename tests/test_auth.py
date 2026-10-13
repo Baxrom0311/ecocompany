@@ -118,6 +118,22 @@ class TestChangePassword:
         assert resp.status_code in (401, 403)
 
 
+class TestPasswordHashingLimits:
+    def test_hash_password_length_check(self):
+        import pytest
+        from app.utils.hashing import hash_password
+
+        # 73 bytes should raise ValueError
+        long_pass = "A" * 73
+        with pytest.raises(ValueError, match="72 bayt"):
+            hash_password(long_pass)
+
+        # 72 bytes should succeed
+        valid_pass = "A" * 72
+        hashed = hash_password(valid_pass)
+        assert hashed is not None
+
+
 class TestHealthCheck:
     def test_health(self, client):
         resp = client.get("/health")

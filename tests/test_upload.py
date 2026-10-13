@@ -67,3 +67,33 @@ class TestUpload:
     def test_delete_unauthenticated(self, client):
         resp = client.delete("/api/v1/admin/upload/test123")
         assert resp.status_code in (401, 403)
+
+    def test_r2_key_extraction_and_url(self):
+        from app.services import r2_service
+        from app.config import settings
+
+        orig_pub = settings.R2_PUBLIC_URL
+        orig_acc = settings.R2_ACCOUNT_ID
+        orig_bkt = settings.R2_BUCKET_NAME
+        try:
+            settings.R2_PUBLIC_URL = "https://media.ecocompany.uz"
+            settings.R2_ACCOUNT_ID = "acc123"
+            settings.R2_BUCKET_NAME = "bkt456"
+
+            url = r2_service.build_r2_url("products/item-1.jpg")
+            assert url == "https://media.ecocompany.uz/products/item-1.jpg"
+
+            key = r2_service.extract_r2_key("https://media.ecocompany.uz/products/item-1.jpg?v=1")
+            assert key == "products/item-1.jpg"
+
+            # Fallback r2.dev
+            settings.R2_PUBLIC_URL = ""
+            url2 = r2_service.build_r2_url("gallery/pic.png")
+            assert url2 == "https://bkt456.acc123.r2.dev/gallery/pic.png"
+
+            key2 = r2_service.extract_r2_key("https://bkt456.acc123.r2.dev/gallery/pic.png")
+            assert key2 == "gallery/pic.png"
+        finally:
+            settings.R2_PUBLIC_URL = orig_pub
+            settings.R2_ACCOUNT_ID = orig_acc
+            settings.R2_BUCKET_NAME = orig_bkt
