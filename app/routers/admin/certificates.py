@@ -67,7 +67,7 @@ async def update_certificate(
     db.commit()
     db.refresh(cert)
     await storage_service.delete_files_by_urls(
-        [url for url in previous_urls if url and url not in {cert.file_url, cert.preview_url}]
+        [url for url in previous_urls if url and url not in {cert.file_url, cert.preview_url}], db=db
     )
     return {"success": True, "data": CertificateResponse.model_validate(cert)}
 
@@ -87,5 +87,5 @@ async def delete_certificate(
     log_action(db, current_user.id, "delete", "certificate", cert.id, ip_address=request.client.host if request.client else None)
     db.delete(cert)
     db.commit()
-    await storage_service.delete_files_by_urls(previous_urls)
+    await storage_service.delete_files_by_urls(previous_urls, db=db)
     return {"success": True, "message": "Sertifikat o'chirildi"}

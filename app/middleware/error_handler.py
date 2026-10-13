@@ -30,6 +30,7 @@ def setup_error_handlers(app: FastAPI) -> None:
         }
         return JSONResponse(
             status_code=exc.status_code,
+            headers=exc.headers,
             content={
                 "success": False,
                 "error": error_map.get(exc.status_code, "server_error"),

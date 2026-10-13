@@ -26,7 +26,8 @@ async def _send_email(to: str, subject: str, html_body: str) -> bool:
             port=settings.SMTP_PORT,
             username=settings.SMTP_USER,
             password=settings.SMTP_PASSWORD,
-            use_tls=True,
+            use_tls=settings.SMTP_USE_TLS,
+            start_tls=settings.SMTP_START_TLS and not settings.SMTP_USE_TLS,
         )
         logger.info(f"📧 Email yuborildi: {to}")
         return True

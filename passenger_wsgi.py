@@ -1,17 +1,12 @@
-"""
-ECO COMPANY — cPanel Passenger WSGI Entry Point
-cPanel shared hosting uchun MAJBURIY fayl
-"""
+"""Passenger entry point; configure the interpreter and environment in cPanel."""
+import atexit
 import sys
-import os
+from pathlib import Path
 
-# Virtual environment Python interpretatori
-INTERP = '/home/ecocompany/fastapi_app/venv/bin/python3'
-if sys.executable != INTERP:
-    os.execl(INTERP, INTERP, *sys.argv)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# Project path
-sys.path.insert(0, '/home/ecocompany/fastapi_app')
+from app.main import app
+from app.wsgi import LifespanWSGI
 
-# FastAPI app import
-from app.main import app as application  # noqa: E402
+application = LifespanWSGI(app)
+atexit.register(application.close)

@@ -112,5 +112,5 @@ async def delete_category(
     db.delete(category)
     db.commit()
     if previous_icon:
-        await storage_service.delete_file_by_url(previous_icon)
+        await storage_service.delete_file_by_url(previous_icon, db=db)
     return {"success": True, "message": "Kategoriya o'chirildi"}

@@ -4,6 +4,7 @@ XSS himoya, Security Headers
 (Pure ASGI — BaseHTTPMiddleware ishlatilMAYDI, chunki u multipart upload ni buzadi)
 """
 from starlette.types import ASGIApp, Scope, Receive, Send
+from app.config import settings
 
 
 class SecurityHeadersMiddleware:
@@ -29,6 +30,10 @@ class SecurityHeadersMiddleware:
                     (b"strict-transport-security", b"max-age=31536000; includeSubDomains"),
                     (b"permissions-policy", b"camera=(), microphone=(), geolocation=()"),
                 ])
+                if scope.get("path", "").startswith(settings.media_url_path.rstrip("/") + "/"):
+                    headers.append((b"content-security-policy", b"sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'"))
+                    if scope["path"].lower().endswith((".html", ".htm", ".svg", ".pdf")):
+                        headers.append((b"content-disposition", b"attachment"))
                 message = {**message, "headers": headers}
             await send(message)
 

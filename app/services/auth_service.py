@@ -13,6 +13,7 @@ def create_access_token(data: dict) -> str:
     data = {"sub": str(user.id)} formatida bo'lishi kerak.
     """
     to_encode = data.copy()
+    to_encode.setdefault("token_version", 0)
     expire = datetime.now(timezone.utc) + timedelta(days=settings.JWT_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)

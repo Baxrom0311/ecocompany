@@ -62,7 +62,6 @@ async def get_album(album_id: UUID, db: Session = Depends(get_db)):
     if not album:
         raise HTTPException(status_code=404, detail="Album topilmadi")
 
-    return {
-        "success": True,
-        "data": GalleryAlbumResponse.model_validate(album),
-    }
+    result = GalleryAlbumResponse.model_validate(album)
+    result.items = [item for item in result.items if item.is_active]
+    return {"success": True, "data": result}

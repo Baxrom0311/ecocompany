@@ -38,12 +38,15 @@ async def get_current_user(
 
     try:
         user_uuid = uuid.UUID(user_id_str)
-    except ValueError:
+    except (ValueError, TypeError, AttributeError):
         raise credentials_exception
 
     # DB dan user olish
     user = db.query(User).filter(User.id == user_uuid).first()
     if user is None:
+        raise credentials_exception
+
+    if payload.get("token_version") != user.token_version:
         raise credentials_exception
 
     # Active tekshirish

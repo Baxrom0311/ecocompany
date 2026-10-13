@@ -7,8 +7,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
+from app.middleware.rate_limit import limiter
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
@@ -21,8 +22,8 @@ from app.services.company_mcp import mcp as company_mcp
 # ── Logger ──
 logger = logging.getLogger("ecocompany")
 
-# ── Rate Limiter ──
-limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute"])
+# ── MCP HTTP application ──
+mcp_app = company_mcp.http_app(path="/", stateless_http=True)
 
 
 # ── Lifespan (startup/shutdown) ──
@@ -51,7 +52,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ Database ulanish xatosi: {e}")
 
-    yield
+    async with mcp_app.lifespan(app):
+        yield
 
     # SHUTDOWN
     logger.info("🛑 ECO COMPANY Backend to'xtadi")
@@ -71,6 +73,7 @@ app = FastAPI(
 
 # ── Rate Limiter ──
 app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS ──
@@ -98,7 +101,7 @@ app.mount(
 )
 app.mount(
     "/api/v1/mcp",
-    company_mcp.http_app(path="/"),
+    mcp_app,
     name="company-mcp",
 )
 

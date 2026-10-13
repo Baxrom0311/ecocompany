@@ -3,6 +3,8 @@ ECO COMPANY — Local Storage Service
 Media fayllarni serverdagi papkaga saqlash/o'chirish
 """
 import asyncio
+import json
+from sqlalchemy.orm import Session
 import re
 import uuid
 from pathlib import Path
@@ -77,6 +79,8 @@ def extract_public_id(file_url: str | None) -> str | None:
 
     try:
         parsed = urlparse(raw_url)
+        if parsed.netloc and settings.PUBLIC_BASE_URL and parsed.netloc != urlparse(settings.PUBLIC_BASE_URL).netloc:
+            return None
         path = parsed.path or raw_url
     except ValueError:
         path = raw_url
@@ -143,15 +147,15 @@ async def delete_file(public_id: str) -> bool:
     return True
 
 
-async def delete_file_by_url(file_url: str | None) -> bool:
+async def delete_file_by_url(file_url: str | None, db: Session | None = None) -> bool:
     """Local media URL bo'yicha faylni o'chirish."""
     public_id = extract_public_id(file_url)
-    if not public_id:
+    if not public_id or (db is not None and is_media_referenced(public_id, db)):
         return False
     return await delete_file(public_id)
 
 
-async def delete_files_by_urls(urls: Iterable[str | None]) -> None:
+async def delete_files_by_urls(urls: Iterable[str | None], db: Session | None = None) -> None:
     """Bir nechta local media URL larni xavfsiz o'chirish."""
     seen: set[str] = set()
     for url in urls:
@@ -159,4 +163,41 @@ async def delete_files_by_urls(urls: Iterable[str | None]) -> None:
         if not public_id or public_id in seen:
             continue
         seen.add(public_id)
-        await delete_file(public_id)
+        if db is None or not is_media_referenced(public_id, db):
+            await delete_file(public_id)
+
+
+def is_media_referenced(public_id: str, db: Session) -> bool:
+    """Preserve shared media, including URLs embedded in JSON site settings."""
+    from app.models.product import Product
+    from app.models.gallery import GalleryItem
+    from app.models.certificate import Certificate
+    from app.models.category import Category
+    from app.models.setting import SiteSetting
+
+    def matches(value):
+        if isinstance(value, str):
+            if extract_public_id(value) == public_id:
+                return True
+            if value.lstrip().startswith(("[", "{")):
+                try:
+                    return matches(json.loads(value))
+                except ValueError:
+                    pass
+        if isinstance(value, list):
+            return any(matches(item) for item in value)
+        if isinstance(value, dict):
+            return any(matches(item) for item in value.values())
+        return False
+
+    for model, columns in (
+        (Product, (Product.images,)),
+        (GalleryItem, (GalleryItem.file_url, GalleryItem.thumbnail_url)),
+        (Certificate, (Certificate.file_url, Certificate.preview_url)),
+        (Category, (Category.icon,)),
+        (SiteSetting, (SiteSetting.value,)),
+    ):
+        for row in db.query(*columns).yield_per(200):
+            if any(matches(value) for value in row):
+                return True
+    return False

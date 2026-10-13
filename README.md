@@ -1,112 +1,51 @@
-# 🌿 ECO COMPANY Backend
+# ECO COMPANY backend
 
-FastAPI backend for ECO COMPANY website — clean water products & services.
+FastAPI + SQLAlchemy + PostgreSQL API: mahsulotlar, galereya, sertifikatlar, kontaktlar, sozlamalar, admin va DeepSeek/FastMCP chatbot.
 
-## Tech Stack
-- **FastAPI** 0.110 + **Uvicorn**
-- **PostgreSQL** + **SQLAlchemy** 2.0 + **Alembic**
-- **JWT** auth (python-jose + bcrypt)
-- **Local media storage** — file uploads
-- **DeepSeek + FastMCP** — AI chatbot
-- **Telegram Bot** — admin notifications
-- **cPanel** deployment (Passenger WSGI)
+## Lokal ishga tushirish
 
-## Quick Start (Local)
-
-```bash
-# 1. Virtual environment
+```sh
 python3.12 -m venv .venv
 source .venv/bin/activate
-
-# 2. Dependencies
 pip install -r requirements.txt
-
-# 3. Environment
 cp .env.example .env
-# Edit .env with real values
-# PUBLIC_BASE_URL ni production backend domeniga qo'ying
-
-# 4. Database
+# .env ichida DATABASE_URL va JWT_SECRET ni kiriting
 alembic upgrade head
 python scripts/seed.py
 python scripts/create_admin.py --email admin@ecocompany.uz
-
-# 5. Run
 uvicorn app.main:app --reload
 ```
 
-Open [http://localhost:8000/docs](http://localhost:8000/docs) for Swagger UI.
+Mijoz sayti `http://localhost:8080`, admin `http://localhost:8081`, API `http://localhost:8000/api/v1`. Lokal `.env` uchun `ALLOWED_ORIGINS=http://localhost:8080,http://localhost:8081` qo‘ying. Swagger kerak bo‘lsa `ENVIRONMENT=development` qo‘ying va `/docs` ni oching.
 
-## cPanel Deploy
+## Yangilash va deployment
 
-```bash
-# 1. cPanel → Setup Python App → Create
-#    Python: 3.11/3.12, App root: ecocompany-backend
+Yangilangan paketlarni o‘rnating va **serverni qayta ishga tushirishdan oldin** `alembic upgrade head` bajaring. `003_user_token_version` mavjud adminlar uchun token revokatsiyasi maydonini qo‘shadi. Oldingi versiyadagi tokenlar yaroqsiz bo‘ladi; adminlar qayta login qiladi. Parol almashtirish va logout shu akkauntning barcha tokenlarini bekor qiladi.
 
-# 2. Terminal
-cd ~/ecocompany-backend
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env && nano .env
-alembic upgrade head
-python scripts/seed.py
-python scripts/create_admin.py --email admin@ecocompany.uz
+ASGI server uchun:
 
-# 3. cPanel → Python App → Restart
-
-# 4. Cron Job (Instagram token refresh, every 25 days)
-#    0 0 */25 * * cd ~/ecocompany-backend && .venv/bin/python cron/instagram_refresh.py
+```sh
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-## API Overview
+HTTPS reverse proxy orqali yo‘naltiring. Passenger/cPanel ishlatilsa Python interpreter, application root va environment qiymatlarini cPanel ichida sozlang; startup fayl `passenger_wsgi.py`, callable `application`. Adapter ASGI lifespan ni ham ishga tushiradi, shuning uchun REST va HTTP MCP bir jarayonda ishlaydi. Lokal WSGI va MCP regression testlari bor; konkret hostingning timeout, process va proxy sozlamalarini o‘sha serverda tekshirish kerak.
 
-| Group | Prefix | Endpoints |
-|-------|--------|-----------|
-| Auth | `/api/v1/auth` | login, me, logout, change-password |
-| Products | `/api/v1/products` | list (paginated), featured, single |
-| Categories | `/api/v1/categories` | list |
-| Certificates | `/api/v1/certificates` | list |
-| Gallery | `/api/v1/gallery` | albums, album detail |
-| Contacts | `/api/v1/contacts` | submit (rate limited) |
-| Settings | `/api/v1/settings` | public key-value |
-| Instagram | `/api/v1/instagram` | cached posts |
-| Chat | `/api/v1/chat` | AI chatbot |
-| Admin | `/api/v1/admin/*` | Full CRUD for all entities |
+`PUBLIC_BASE_URL` — API/media domeni (masalan, `https://api.example.com`). `SITE_URL` — mijoz sayti domeni (masalan, `https://www.example.com`); alohida domen ishlatilganda uni majburiy sozlang. `ALLOWED_ORIGINS` ga mijoz va admin domenlarini kiriting.
 
-## Media Storage
+`media/` persistent storage bo‘lishi kerak. Yangi uploadlarda fayl mazmuni, kengaytmasi va hajmi tekshiriladi; rasmlar metadata olib tashlanib qayta kodlanadi. SVG va HTML yuklash qabul qilinmaydi. PDF/video uchun format signaturalari tekshiriladi; PDF attachment sifatida beriladi. Boshqa obyekt hali foydalanayotgan fayl o‘chirilmaydi.
 
-- Yuklangan rasm/video/PDF fayllar backend ichidagi `media/` papkasida saqlanadi.
-- API yangi uploadlar uchun `/media/...` URL qaytaradi.
-- Production'da `PUBLIC_BASE_URL` ni backend domeniga sozlang.
-- Deploy paytida `media/` papkasini persistent storage sifatida saqlang.
+Rate limit: umumiy 120/minut, login 5/minut, kontakt 5/soat, chat 20/soat; hisob har bir backend jarayoni xotirasida yuritiladi. Ko‘p worker/replica ishlatilsa umumiy limit uchun shared storage yoki reverse proxy limitini sozlang. Proxy ortida haqiqiy mijoz IP sini faqat ishonchli proxy orqali uzating.
 
-Eski remote media URL'larni local storage'ga ko'chirish:
+## Chatbot va integratsiyalar
 
-```bash
-python scripts/migrate_legacy_media_to_local_storage.py --base-url https://api.ecocompany.uz
+Saytdagi pastki o‘ng chat tugmasi `/api/v1/chat` ga murojaat qiladi. `DEEPSEEK_API_KEY` backend `.env` faylida beriladi; frontendga kalit yozilmaydi. `DEEPSEEK_BASE_URL` va `DEEPSEEK_MODEL` ham shu yerda sozlanadi. API kaliti bo‘lmasa foydalanuvchi chat sozlanmaganligi haqida javob oladi. AI prompt super-admin sozlamalarida boshqariladi. Public ma’lumotlar uchun HTTP MCP endpoint: `/api/v1/mcp/`.
+
+SMTP 587 uchun standart sozlama: `SMTP_USE_TLS=false`, `SMTP_START_TLS=true`. Implicit TLS/465 ishlatilsa `SMTP_PORT=465`, `SMTP_USE_TLS=true`, `SMTP_START_TLS=false` qo‘ying. Telegram uchun bot tokeni va chat ID larini backend `.env` da kiriting. Instagram videolari admin panelida link bilan boshqariladi; token refresh cron kerak emas.
+
+## Tekshiruv
+
+```sh
+python -m pytest tests -q
 ```
 
-## Admin Bootstrap
-
-```
-python scripts/create_admin.py --email admin@ecocompany.uz
-```
-
-If `--password` berilmasa, skript xavfsiz random parol generatsiya qiladi va uni bir marta terminalga chiqaradi.
-
-## Project Structure
-
-```
-app/
-├── config.py          # Pydantic Settings
-├── database.py        # SQLAlchemy engine
-├── main.py            # FastAPI app
-├── models/            # 11 SQLAlchemy models
-├── schemas/           # 9 Pydantic schema modules
-├── routers/           # Public API routers
-│   └── admin/         # Admin CRUD routers
-├── services/          # Business logic (7 services)
-├── middleware/        # Error handler, logging, security
-├── dependencies/      # Auth dependencies
-└── utils/             # Hashing, pagination, sanitize
-```
+Testlar vaqtinchalik media, in-memory SQLite va test kalitlarini ishlatadi; developer bazasi va haqiqiy integratsiya kalitlari ishlatilmaydi. Regression testlar login limiti, token revokatsiyasi, upload, chat, MCP, WSGI adapter va yangi/mavjud bazadagi migratsiyalarni qamraydi. PostgreSQL/hosting integratsiyasini deploy muhitida alohida tekshiring.

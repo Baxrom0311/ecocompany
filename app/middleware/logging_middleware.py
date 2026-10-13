@@ -12,6 +12,8 @@ from starlette.types import ASGIApp, Scope, Receive, Send
 
 def setup_logging() -> None:
     """Log fayllar va formatlashni sozlash"""
+    if logging.getLogger("ecocompany").handlers:
+        return
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
 

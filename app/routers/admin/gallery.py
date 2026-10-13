@@ -3,6 +3,7 @@ ECO COMPANY — Admin Gallery CRUD
 Albums + Items boshqarish
 """
 from uuid import UUID
+from app.schemas.common import ReorderItem
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -82,7 +83,7 @@ async def delete_album(
         previous_urls.extend([item.file_url, item.thumbnail_url])
     db.delete(album)  # CASCADE — items ham o'chiriladi
     db.commit()
-    await storage_service.delete_files_by_urls(previous_urls)
+    await storage_service.delete_files_by_urls(previous_urls, db=db)
     return {"success": True, "message": "Album va barcha elementlari o'chirildi"}
 
 
@@ -127,7 +128,7 @@ async def update_item(
     db.commit()
     db.refresh(item)
     await storage_service.delete_files_by_urls(
-        [url for url in previous_urls if url and url not in {item.file_url, item.thumbnail_url}]
+        [url for url in previous_urls if url and url not in {item.file_url, item.thumbnail_url}], db=db
     )
     return {"success": True, "data": GalleryItemResponse.model_validate(item)}
 
@@ -148,20 +149,20 @@ async def delete_item(
     previous_urls = [item.file_url, item.thumbnail_url]
     db.delete(item)
     db.commit()
-    await storage_service.delete_files_by_urls(previous_urls)
+    await storage_service.delete_files_by_urls(previous_urls, db=db)
     return {"success": True, "message": "Element o'chirildi"}
 
 
 @router.post("/albums/{album_id}/items/reorder")
 async def reorder_items(
     album_id: UUID,
-    items: list[dict],
+    items: list[ReorderItem],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     for item in items:
         db.query(GalleryItem).filter(
-            GalleryItem.id == item["id"], GalleryItem.album_id == album_id
-        ).update({"order_index": item["order_index"]})
+            GalleryItem.id == item.id, GalleryItem.album_id == album_id
+        ).update({"order_index": item.order_index})
     db.commit()
     return {"success": True, "message": "Tartib yangilandi"}

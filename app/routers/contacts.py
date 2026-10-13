@@ -4,8 +4,7 @@ Aloqa formasi (rate limited + email/telegram)
 """
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from sqlalchemy.orm import Session
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.middleware.rate_limit import limiter
 from app.database import get_db
 from app.models.contact import ContactMessage
 from app.schemas.contact import ContactCreate
@@ -13,7 +12,6 @@ from app.utils.sanitize import sanitize_html
 from app.services import email_service, telegram_service
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("")

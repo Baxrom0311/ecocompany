@@ -4,14 +4,12 @@ AI chatbot (DeepSeek + FastMCP, rate limited)
 """
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.middleware.rate_limit import limiter
 from app.database import get_db
 from app.schemas.chat import ChatMessage, ChatResponse
 from app.services import ai_service
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("")

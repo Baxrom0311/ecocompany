@@ -7,6 +7,12 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
 
 
+def validate_password_length(value: str) -> str:
+    if len(value.encode("utf-8")) > 72:
+        raise ValueError("Parol UTF-8 formatida 72 baytdan oshmasligi kerak")
+    return value
+
+
 class UserLogin(BaseModel):
     """Login so'rovi"""
     email: EmailStr
@@ -24,6 +30,7 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
+        validate_password_length(v)
         if len(v) < 8:
             raise ValueError("Parol kamida 8 ta belgi bo'lishi kerak")
         if not any(c.isdigit() for c in v):
@@ -82,8 +89,11 @@ class ChangePassword(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, v: str) -> str:
+        validate_password_length(v)
         if len(v) < 8:
             raise ValueError("Yangi parol kamida 8 ta belgi bo'lishi kerak")
         if not any(c.isdigit() for c in v):
             raise ValueError("Parolda kamida 1 ta raqam bo'lishi kerak")
+        if not any(c.isalpha() for c in v):
+            raise ValueError("Parolda kamida 1 ta harf bo'lishi kerak")
         return v

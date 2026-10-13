@@ -2,7 +2,8 @@
 ECO COMPANY — Common Schemas
 Umumiy response sxemalari (barcha routerlarda ishlatiladi)
 """
-from pydantic import BaseModel
+from uuid import UUID
+from pydantic import BaseModel, Field
 from typing import Any, Optional
 
 
@@ -34,3 +35,8 @@ class PaginatedResponse(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+class ReorderItem(BaseModel):
+    id: UUID
+    order_index: int = Field(ge=0)

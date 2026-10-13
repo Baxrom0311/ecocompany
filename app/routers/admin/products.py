@@ -2,6 +2,7 @@
 ECO COMPANY — Admin Products CRUD
 """
 from uuid import UUID
+from app.schemas.common import ReorderItem
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -96,7 +97,7 @@ async def update_product(
     db.refresh(product)
     next_images = list(product.images or [])
     await storage_service.delete_files_by_urls(
-        [url for url in previous_images if url and url not in next_images]
+        [url for url in previous_images if url and url not in next_images], db=db
     )
     return {"success": True, "data": ProductResponse.model_validate(product)}
 
@@ -117,20 +118,20 @@ async def delete_product(
     log_action(db, current_user.id, "delete", "product", product.id, ip_address=request.client.host if request.client else None)
     db.delete(product)
     db.commit()
-    await storage_service.delete_files_by_urls(previous_images)
+    await storage_service.delete_files_by_urls(previous_images, db=db)
     return {"success": True, "message": "Mahsulot o'chirildi"}
 
 
 @router.post("/reorder")
 async def reorder_products(
-    items: list[dict],
+    items: list[ReorderItem],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Mahsulotlar tartibini o'zgartirish"""
     for item in items:
-        db.query(Product).filter(Product.id == UUID(item["id"])).update(
-            {"order_index": item["order_index"]}
+        db.query(Product).filter(Product.id == item.id).update(
+            {"order_index": item.order_index}
         )
     db.commit()
     return {"success": True, "message": "Tartib yangilandi"}

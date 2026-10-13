@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # ── Email (SMTP) ──
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
+    SMTP_USE_TLS: bool = False
+    SMTP_START_TLS: bool = True
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     ADMIN_EMAIL: str = ""
@@ -38,6 +40,7 @@ class Settings(BaseSettings):
     MEDIA_ROOT: str = "media"
     MEDIA_URL_PATH: str = "/media"
     PUBLIC_BASE_URL: str = ""
+    SITE_URL: str = ""
 
     # ── Instagram ──
     INSTAGRAM_ACCESS_TOKEN: str = ""
@@ -45,7 +48,7 @@ class Settings(BaseSettings):
     INSTAGRAM_CACHE_HOURS: int = 6
 
     # ── CORS ──
-    ALLOWED_ORIGINS: str = "http://localhost:3000"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8080,http://localhost:8081"
 
     # ── Environment ──
     ENVIRONMENT: str = "development"

@@ -2,7 +2,7 @@
 ECO COMPANY — Auth Router
 Login, me, logout endpointlari
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
@@ -13,11 +13,14 @@ from app.services.auth_service import create_access_token
 from app.utils.hashing import verify_password, hash_password
 from app.dependencies.auth import get_current_user
 
+from app.middleware.rate_limit import limiter
+
 router = APIRouter()
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(data: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
     """Admin login — email + password → JWT token"""
 
     # 1. Email bo'yicha user topish
@@ -43,7 +46,7 @@ async def login(data: UserLogin, db: Session = Depends(get_db)):
         )
 
     # 4. Token yaratish
-    access_token = create_access_token({"sub": str(user.id)})
+    access_token = create_access_token({"sub": str(user.id), "token_version": user.token_version})
 
     return TokenResponse(
         access_token=access_token,
@@ -58,11 +61,10 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(get_current_user)):
-    """
-    Logout — stateless JWT.
-    Frontend token o'zi o'chiradi, backend tarafda hech narsa qilish kerak emas.
-    """
+async def logout(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Revoke all tokens for this account, including the current token."""
+    current_user.token_version += 1
+    db.commit()
     return {"success": True, "message": "Muvaffaqiyatli chiqildi"}
 
 
@@ -83,6 +85,7 @@ async def change_password(
 
     # Yangi parolni saqlash
     current_user.password = hash_password(data.new_password)
+    current_user.token_version += 1
     db.commit()
 
     return {"success": True, "message": "Parol muvaffaqiyatli o'zgartirildi"}

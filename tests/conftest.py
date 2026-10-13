@@ -2,6 +2,19 @@
 ECO COMPANY — Test Fixtures
 SQLite in-memory DB + TestClient + Admin token
 """
+import os
+import tempfile
+import shutil
+import atexit
+
+# Tests never use a developer's database, media directory, or service credentials.
+_test_media = tempfile.mkdtemp(prefix="ecocompany-tests-")
+atexit.register(shutil.rmtree, _test_media, ignore_errors=True)
+os.environ.update(DATABASE_URL="sqlite://", JWT_SECRET="test-only-secret-not-for-deployment",
+                  ENVIRONMENT="production", MEDIA_ROOT=_test_media, SITE_URL="",
+                  PUBLIC_BASE_URL="", DEEPSEEK_API_KEY="", SMTP_HOST="",
+                  TELEGRAM_BOT_TOKEN="", TELEGRAM_CHAT_IDS="")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -36,18 +49,27 @@ def db():
         Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(scope="session")
+def app_client():
+    # FastMCP's HTTP session manager has one lifespan per application process.
+    with TestClient(app) as c:
+        yield c
+
+
 @pytest.fixture(scope="function")
-def client(db):
+def client(db, app_client):
     def override_get_db():
         try:
             yield db
         finally:
             pass
 
+    app.state.limiter.reset()
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+    try:
+        yield app_client
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="function")

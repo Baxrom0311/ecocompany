@@ -19,6 +19,8 @@ router = APIRouter(include_in_schema=False)
 
 
 def _public_site_url(request: Request) -> str:
+    if settings.SITE_URL:
+        return settings.SITE_URL.rstrip("/")
     if settings.PUBLIC_BASE_URL:
         return settings.PUBLIC_BASE_URL.rstrip("/")
     return str(request.base_url).rstrip("/")
