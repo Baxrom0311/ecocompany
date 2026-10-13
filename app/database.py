@@ -8,18 +8,22 @@ from app.config import settings
 
 
 # ── Engine ──
+_raw_db_url = settings.DATABASE_URL
+if _raw_db_url.startswith("postgres://"):
+    _raw_db_url = _raw_db_url.replace("postgres://", "postgresql://", 1)
+
 # SQLite va PostgreSQL uchun mos sozlamalar
-_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_is_sqlite = _raw_db_url.startswith("sqlite")
 
 if _is_sqlite:
     engine = create_engine(
-        settings.DATABASE_URL,
+        _raw_db_url,
         connect_args={"check_same_thread": False},
         echo=not settings.is_production,
     )
 else:
     engine = create_engine(
-        settings.DATABASE_URL,
+        _raw_db_url,
         pool_size=10,
         max_overflow=20,
         pool_timeout=30,

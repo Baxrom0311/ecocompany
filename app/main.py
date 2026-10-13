@@ -51,8 +51,12 @@ async def lifespan(app: FastAPI):
     try:
         with engine.connect() as conn:
             logger.info("✅ Database ulandi")
+        from app.database import SessionLocal
+        from app.services.init_data import seed_initial_data
+        with SessionLocal() as db:
+            seed_initial_data(db)
     except Exception as e:
-        logger.warning(f"⚠️ Database ulanish xatosi: {e}")
+        logger.warning(f"⚠️ Database ulanish yoki boshlang'ich ma'lumotlar xatosi: {e}")
 
     async with mcp_app.lifespan(app):
         yield
@@ -82,6 +86,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.northflank\.app)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
