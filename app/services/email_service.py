@@ -14,14 +14,18 @@ logger = logging.getLogger("ecocompany")
 async def _send_email(to: str, subject: str, html_body: str) -> bool:
     """Email yuborish (low-level)"""
     try:
+        sender_email = settings.SMTP_FROM_EMAIL or settings.SMTP_USER or "info@ecocompany.uz"
+        sender_name = settings.SMTP_FROM_NAME or "ECO COMPANY"
+
         msg = MIMEMultipart("alternative")
-        msg["From"] = f"ECO COMPANY <{settings.SMTP_USER}>"
+        msg["From"] = f"{sender_name} <{sender_email}>"
         msg["To"] = to
         msg["Subject"] = subject
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         await aiosmtplib.send(
             msg,
+            sender=sender_email,
             hostname=settings.SMTP_HOST,
             port=settings.SMTP_PORT,
             username=settings.SMTP_USER,
@@ -61,7 +65,8 @@ async def send_contact_notification(contact) -> bool:
         </div>
     </div>
     """
-    return await _send_email(settings.ADMIN_EMAIL, f"🌿 Yangi xabar: {contact.name}", html)
+    admin_recipient = settings.ADMIN_EMAIL or settings.SMTP_USER or "admin@ecocompany.uz"
+    return await _send_email(admin_recipient, f"🌿 Yangi xabar: {contact.name}", html)
 
 
 async def send_contact_confirmation(contact) -> bool:

@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     SMTP_START_TLS: bool = True
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "info@ecocompany.uz"
+    SMTP_FROM_NAME: str = "ECO COMPANY"
     ADMIN_EMAIL: str = ""
 
     # ── Telegram ──
