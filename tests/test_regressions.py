@@ -13,6 +13,7 @@ from app.config import settings
 from app.models.gallery import GalleryAlbum, GalleryItem
 from app.models.product import Product
 from app.models.setting import SiteSetting
+from app.models.user import User
 
 
 def test_login_rate_limit(client):
@@ -47,6 +48,50 @@ def test_logout_revokes_token(client, admin_headers):
     response = client.get('/api/v1/auth/me', headers=admin_headers)
     assert response.status_code == 401
     assert response.headers['www-authenticate'] == 'Bearer'
+
+
+def test_default_seeder_never_creates_a_known_password_admin(db):
+    from app.services.init_data import seed_initial_data
+
+    seed_initial_data(db)
+    assert db.query(User).count() == 0
+
+
+def test_admin_password_reset_revokes_old_sessions(db, monkeypatch):
+    from app.utils.hashing import hash_password, verify_password
+    from scripts import create_admin as admin_script
+    from tests.conftest import TestingSessionLocal
+
+    user = User(email='admin@ecocompany.uz', password=hash_password('Admin123!'), name='Admin', role='super_admin')
+    db.add(user); db.commit(); db.refresh(user)
+    old_version = user.token_version
+    monkeypatch.setattr(admin_script, 'SessionLocal', TestingSessionLocal)
+
+    admin_script.create_admin(user.email, user.name, 'NewSecurePass123!', reset_existing=True)
+
+    db.refresh(user)
+    assert user.token_version == old_version + 1
+    assert verify_password('NewSecurePass123!', user.password)
+
+
+def test_admin_password_reset_requires_explicit_flag(db, monkeypatch):
+    from app.utils.hashing import hash_password, verify_password
+    from scripts import create_admin as admin_script
+    from tests.conftest import TestingSessionLocal
+
+    user = User(email='admin@ecocompany.uz', password=hash_password('Admin123!'), name='Admin', role='super_admin')
+    db.add(user); db.commit()
+    monkeypatch.setattr(admin_script, 'SessionLocal', TestingSessionLocal)
+
+    admin_script.create_admin(user.email, user.name, 'NewSecurePass123!')
+
+    db.refresh(user)
+    assert verify_password('Admin123!', user.password)
+
+
+def test_cors_does_not_allow_arbitrary_vercel_previews(client):
+    response = client.get('/health', headers={'Origin': 'https://attacker-preview.vercel.app'})
+    assert 'access-control-allow-origin' not in response.headers
 
 
 @pytest.mark.parametrize('filename, data, mime', [

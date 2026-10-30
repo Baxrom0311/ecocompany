@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 # ── Public ──
 class ChatMessage(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
-    session_id: str | None = None
+    session_id: str | None = Field(default=None, max_length=64)
 
 
 class ChatResponse(BaseModel):

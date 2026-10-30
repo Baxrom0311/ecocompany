@@ -102,6 +102,8 @@ class TestEmailService:
 
         result = await send_contact_notification(mock_contact)
         assert result is True
+        sent_msg = mock_send.call_args.args[0]
+        assert sent_msg["Reply-To"] == "test@test.com"
 
     @patch("app.services.email_service.aiosmtplib.send", new_callable=AsyncMock)
     async def test_send_user_confirmation(self, mock_send):

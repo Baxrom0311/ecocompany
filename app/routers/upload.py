@@ -14,6 +14,7 @@ from app.services import storage_service
 
 logger = logging.getLogger("ecocompany")
 router = APIRouter()
+ALLOWED_UPLOAD_FOLDERS = {"products", "categories", "certificates", "gallery", "partners", "settings", "ecocompany"}
 
 @router.post("/upload")
 async def upload_file(
@@ -24,6 +25,9 @@ async def upload_file(
 ):
     """Fayl yuklash (rasm/video/PDF → local media storage)"""
     logger.info(f"Upload: filename={file.filename}, content_type={file.content_type}, folder={folder}")
+
+    if folder not in ALLOWED_UPLOAD_FOLDERS:
+        raise HTTPException(status_code=400, detail="Noto'g'ri media papkasi")
 
     contents = await read_upload(file)
     contents = await asyncio.to_thread(validate_upload, contents, file.filename or "", file.content_type or "")
@@ -50,9 +54,15 @@ async def delete_uploaded(
     current_user: User = Depends(get_current_user),
 ):
     """Serverdagi media faylni o'chirish"""
-    if storage_service.is_media_referenced(public_id, db):
+    normalized_id = public_id.strip().lstrip("/")
+    # Eski mijozlar folder ko'rsatmasdan saqlagan ID'larni default papkaga yo'naltir.
+    if "/" not in normalized_id and normalized_id:
+        normalized_id = f"ecocompany/{normalized_id}"
+    if not normalized_id or ".." in normalized_id.split("/") or normalized_id.split("/", 1)[0] not in ALLOWED_UPLOAD_FOLDERS:
+        raise HTTPException(status_code=400, detail="Noto'g'ri media fayl identifikatori")
+    if storage_service.is_media_referenced(normalized_id, db):
         raise HTTPException(409, "Fayl hali saytda ishlatilmoqda")
-    deleted = await storage_service.delete_file(public_id)
+    deleted = await storage_service.delete_file(normalized_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Fayl topilmadi yoki allaqachon o'chirilgan")
     return {"success": True, "message": "Fayl o'chirildi"}

@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """ALLOWED_ORIGINS ni list ga aylantirish"""
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+        return [origin.strip().rstrip("/") for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     @property
     def telegram_chat_list(self) -> list[str]:

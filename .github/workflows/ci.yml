@@ -62,14 +62,17 @@ jobs:
   deploy-northflank:
     name: Trigger Northflank Deploy
     needs: [test, docker-build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Northflank Webhook (if configured)
-        if: env.NORTHFLANK_WEBHOOK != ''
         env:
           NORTHFLANK_WEBHOOK: ${{ secrets.NORTHFLANK_DEPLOY_WEBHOOK }}
         run: |
+          if [ -z "$NORTHFLANK_WEBHOOK" ]; then
+            echo "Northflank webhook is not configured; skipping deploy trigger."
+            exit 0
+          fi
           echo "🚀 Triggering Northflank Deployment..."
-          curl -s -X POST "$NORTHFLANK_WEBHOOK" || true
+          curl --fail --silent --show-error --retry 3 -X POST "$NORTHFLANK_WEBHOOK"
           echo "✅ Deployment triggered successfully!"

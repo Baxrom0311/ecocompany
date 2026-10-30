@@ -2,6 +2,7 @@
 Test Upload Router — file upload validation, auth guard, delete
 """
 import io
+import pytest
 from unittest.mock import patch, AsyncMock
 
 
@@ -86,13 +87,13 @@ class TestUpload:
             key = r2_service.extract_r2_key("https://media.ecocompany.uz/products/item-1.jpg?v=1")
             assert key == "products/item-1.jpg"
 
-            # Fallback r2.dev
+            # R2.dev URL'ini Cloudflare bergan public URL sifatida aniq berish kerak.
             settings.R2_PUBLIC_URL = ""
-            url2 = r2_service.build_r2_url("gallery/pic.png")
-            assert url2 == "https://bkt456.acc123.r2.dev/gallery/pic.png"
+            with pytest.raises(RuntimeError, match="R2_PUBLIC_URL"):
+                r2_service.build_r2_url("gallery/pic.png")
 
-            key2 = r2_service.extract_r2_key("https://bkt456.acc123.r2.dev/gallery/pic.png")
-            assert key2 == "gallery/pic.png"
+            settings.R2_PUBLIC_URL = "https://media.ecocompany.uz"
+            assert r2_service.extract_r2_key("https://media.ecocompany.uz.evil.test/gallery/pic.png") is None
         finally:
             settings.R2_PUBLIC_URL = orig_pub
             settings.R2_ACCOUNT_ID = orig_acc

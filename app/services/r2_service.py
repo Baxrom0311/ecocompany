@@ -6,7 +6,7 @@ import asyncio
 import uuid
 import re
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urlparse
 
 from app.config import settings
 
@@ -31,6 +31,8 @@ def _get_r2_client():
         config=Config(
             signature_version="s3v4",
             retries={"max_attempts": 3, "mode": "standard"},
+            connect_timeout=5,
+            read_timeout=30,
         ),
         region_name="auto",
     )
@@ -61,8 +63,7 @@ def build_r2_url(key: str) -> str:
     public_url = settings.R2_PUBLIC_URL.rstrip("/")
     if public_url:
         return f"{public_url}/{key.lstrip('/')}"
-    # fallback — R2 r2.dev URL
-    return f"https://{settings.R2_BUCKET_NAME}.{settings.R2_ACCOUNT_ID}.r2.dev/{key.lstrip('/')}"
+    raise RuntimeError("R2_PUBLIC_URL sozlanmagan")
 
 
 import mimetypes
@@ -74,22 +75,26 @@ def extract_r2_key(file_url: str | None) -> str | None:
     if not file_url:
         return None
 
-    clean_url = file_url.split("?")[0].strip()
+    clean_url = file_url.strip()
+    try:
+        parsed = urlparse(clean_url)
+    except ValueError:
+        return None
 
     public_url = settings.R2_PUBLIC_URL.rstrip("/")
-    if public_url and clean_url.startswith(public_url):
-        key = clean_url[len(public_url):].lstrip("/")
-        return key or None
-
-    # fallback r2.dev URL
-    if settings.R2_BUCKET_NAME and settings.R2_ACCOUNT_ID:
-        r2dev_prefix = f"https://{settings.R2_BUCKET_NAME}.{settings.R2_ACCOUNT_ID}.r2.dev"
-        if clean_url.startswith(r2dev_prefix):
-            key = clean_url[len(r2dev_prefix):].lstrip("/")
-            return key or None
+    if public_url:
+        try:
+            public = urlparse(public_url)
+        except ValueError:
+            return None
+        base_path = public.path.rstrip("/")
+        if parsed.scheme == public.scheme and parsed.netloc.lower() == public.netloc.lower():
+            if parsed.path.startswith(base_path + "/"):
+                key = parsed.path[len(base_path):].lstrip("/")
+                return key or None
 
     # If it's already a relative path / key (e.g. 'ecocompany/image-123.jpg')
-    if "://" not in clean_url and not clean_url.startswith("/"):
+    if not parsed.scheme and not clean_url.startswith("/") and "?" not in clean_url and "#" not in clean_url:
         return clean_url
 
     return None

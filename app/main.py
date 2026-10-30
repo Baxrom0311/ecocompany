@@ -4,7 +4,9 @@ Main entry point — CORS, middleware, routers
 """
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -37,6 +39,12 @@ async def lifespan(app: FastAPI):
     logger.info("🌿 ECO COMPANY Backend ishga tushdi")
     logger.info(f"📌 Environment: {settings.ENVIRONMENT}")
     logger.info(f"📦 Storage backend: {settings.STORAGE_BACKEND}")
+    if settings.is_r2_backend:
+        if not all((settings.R2_ACCOUNT_ID, settings.R2_ACCESS_KEY_ID, settings.R2_SECRET_ACCESS_KEY, settings.R2_BUCKET_NAME, settings.R2_PUBLIC_URL)):
+            raise RuntimeError("R2 backend uchun account ID, API kalitlari, bucket va public URL sozlanishi kerak")
+        public_url = urlparse(settings.R2_PUBLIC_URL)
+        if public_url.scheme not in {"http", "https"} or not public_url.netloc:
+            raise RuntimeError("R2_PUBLIC_URL to'g'ri HTTPS yoki HTTP manzil bo'lishi kerak")
 
     # Import all models so Base.metadata knows about them
     from app.models import user, category, product, certificate  # noqa
@@ -86,7 +94,6 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.northflank\.app|(.*\.)?ecocompany\.uz)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -117,15 +124,14 @@ app.mount(
 # ── Health Check ──
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Server holati tekshirish"""
-    return {
-        "success": True,
-        "data": {
-            "status": "ok",
-            "version": "3.0.0",
-            "environment": settings.ENVIRONMENT,
-        },
-    }
+    """Server va ma'lumotlar bazasining tayyorligini tekshirish."""
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("SELECT 1")
+    except Exception:
+        logger.exception("Health check: database ulanishi ishlamayapti")
+        return JSONResponse(status_code=503, content={"success": False, "data": {"status": "degraded", "database": "unavailable"}})
+    return {"success": True, "data": {"status": "ok", "database": "ok", "version": "3.0.0", "environment": settings.ENVIRONMENT}}
 
 
 # ────────────────────────────────────────────────

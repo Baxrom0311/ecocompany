@@ -2,10 +2,11 @@
 ECO COMPANY — Admin Settings
 """
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import Field
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.setting import SiteSetting
-from app.schemas.setting import SettingResponse, SettingUpdate
+from app.schemas.setting import SettingBulkUpdate, SettingResponse, SettingUpdate
 from app.dependencies.auth import get_current_user, get_super_admin
 from app.models.user import User
 from app.utils.site_settings import (
@@ -39,16 +40,16 @@ async def list_settings(
 
 @router.put("/bulk")
 async def bulk_update_settings(
-    items: list[dict],
+    items: list[SettingBulkUpdate] = Field(..., max_length=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin),
 ):
     """Ko'p sozlamani bir vaqtda saqlash (faqat super_admin)"""
     blocked_keys = sorted(
         {
-            item.get("key")
+            item.key
             for item in items
-            if item.get("key") and is_env_managed_setting(item.get("key"))
+            if is_env_managed_setting(item.key)
         }
     )
     if blocked_keys:
@@ -62,10 +63,8 @@ async def bulk_update_settings(
 
     updated = 0
     for item in items:
-        key = item.get("key")
-        value = item.get("value")
-        if not key:
-            continue
+        key = item.key
+        value = item.value
 
         is_public = not is_non_public_setting(key)
         setting = db.query(SiteSetting).filter(SiteSetting.key == key).first()

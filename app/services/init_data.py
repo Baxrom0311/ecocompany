@@ -1,13 +1,11 @@
 """
 ECO COMPANY — Initial Database Seeder
-Yangi bazada avtomatik super_admin, boshlang'ich kategoriyalar va sayt sozlamalarini yaratish
+Boshlang'ich kategoriyalar va sayt sozlamalarini yaratish
 """
 import logging
 from sqlalchemy.orm import Session
-from app.models.user import User
 from app.models.setting import SiteSetting
 from app.models.category import Category
-from app.utils.hashing import hash_password
 
 logger = logging.getLogger("ecocompany.init")
 
@@ -15,22 +13,8 @@ logger = logging.getLogger("ecocompany.init")
 def seed_initial_data(db: Session) -> None:
     """Agar baza bo'sh bo'lsa, birlamchi ma'lumotlarni xavfsiz yaratish."""
     try:
-        # 1. Super Admin yaratish (agar user bo'lmasa)
-        user_count = db.query(User).count()
-        if user_count == 0:
-            logger.info("🌱 Yangi baza aniqlandi: Super Admin foydalanuvchisi yaratilmoqda...")
-            admin_user = User(
-                email="admin@ecocompany.uz",
-                password=hash_password("Admin123!"),
-                name="Boshqaruvchi Admin",
-                role="super_admin",
-                is_active=True,
-            )
-            db.add(admin_user)
-            db.commit()
-            logger.info("✅ Standart Super Admin yaratildi: admin@ecocompany.uz / Admin123!")
-
-        # 2. Boshlang'ich Sayt Sozlamalari (agar sozlamalar bo'lmasa)
+        # Admin hisoblari faqat operator tomonidan create_admin.py orqali yaratiladi.
+        # 1. Boshlang'ich Sayt Sozlamalari (agar sozlamalar bo'lmasa)
         setting_count = db.query(SiteSetting).count()
         if setting_count == 0:
             logger.info("🌱 Boshlang'ich sayt sozlamalari yaratilmoqda...")
@@ -52,7 +36,7 @@ def seed_initial_data(db: Session) -> None:
             db.commit()
             logger.info("✅ Boshlang'ich sozlamalar yaratildi")
 
-        # 3. Boshlang'ich Kategoriyalar (agar kategoriya bo'lmasa)
+        # 2. Boshlang'ich Kategoriyalar (agar kategoriya bo'lmasa)
         cat_count = db.query(Category).count()
         if cat_count == 0:
             logger.info("🌱 Boshlang'ich kategoriyalar yaratilmoqda...")
