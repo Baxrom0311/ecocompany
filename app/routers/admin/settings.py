@@ -1,8 +1,8 @@
 """
 ECO COMPANY — Admin Settings
 """
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import Field
+from typing import Annotated
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.setting import SiteSetting
@@ -40,7 +40,7 @@ async def list_settings(
 
 @router.put("/bulk")
 async def bulk_update_settings(
-    items: list[SettingBulkUpdate] = Field(..., max_length=100),
+    items: Annotated[list[SettingBulkUpdate], Body(max_length=100)],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin),
 ):

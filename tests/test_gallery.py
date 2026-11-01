@@ -287,6 +287,12 @@ class TestAdminSettings:
         assert resp.status_code == 200
         assert "2" in resp.json()["message"]
 
+    def test_bulk_update_rejects_more_than_100_items(self, client, admin_headers):
+        resp = client.put("/api/v1/admin/settings/bulk", headers=admin_headers, json=[
+            {"key": f"k{i}", "value": "v"} for i in range(101)
+        ])
+        assert resp.status_code == 422
+
     def test_bulk_update_rejects_env_managed_keys(self, client, admin_headers):
         resp = client.put("/api/v1/admin/settings/bulk", headers=admin_headers, json=[
             {"key": "smtp_password", "value": "secret"},
