@@ -20,6 +20,7 @@ from app.middleware.error_handler import setup_error_handlers
 from app.middleware.logging_middleware import LoggingMiddleware, setup_logging
 from app.middleware.security import SecurityHeadersMiddleware
 from app.services.company_mcp import mcp as company_mcp
+from app.services.site_rebuild import schedule_site_rebuild, should_rebuild
 
 # ── Logger ──
 logger = logging.getLogger("ecocompany")
@@ -108,6 +109,15 @@ app.add_middleware(
 # ── Custom Middleware ──
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(LoggingMiddleware)
+
+# ── Public site rebuild on content changes ──
+@app.middleware("http")
+async def site_rebuild_middleware(request, call_next):
+    response = await call_next(request)
+    if should_rebuild(request.method, request.url.path, response.status_code):
+        schedule_site_rebuild()
+    return response
+
 
 # ── Error Handlers ──
 setup_error_handlers(app)

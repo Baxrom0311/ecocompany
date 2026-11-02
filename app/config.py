@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     MEDIA_URL_PATH: str = "/media"
     PUBLIC_BASE_URL: str = ""
     SITE_URL: str = ""
+    SITE_REBUILD_HOOK_URL: str = ""  # Vercel deploy hook: kontent o'zgarganda saytni qayta build qilish
 
     # ── Storage Backend ──
     STORAGE_BACKEND: str = "local"  # "local" yoki "r2"
