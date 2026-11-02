@@ -3,6 +3,7 @@ ECO COMPANY — Admin Users Management
 """
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
@@ -30,7 +31,7 @@ async def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_super_admin),
 ):
-    existing = db.query(User).filter(User.email == data.email).first()
+    existing = db.query(User).filter(func.lower(User.email) == data.email).first()
     if existing:
         raise HTTPException(status_code=409, detail="Bu email allaqachon mavjud")
 
@@ -64,7 +65,7 @@ async def update_user(
     update_data = data.model_dump(exclude_unset=True)
     if "email" in update_data:
         existing = db.query(User).filter(
-            User.email == update_data["email"], User.id != user_id
+            func.lower(User.email) == update_data["email"], User.id != user_id
         ).first()
         if existing:
             raise HTTPException(status_code=409, detail="Bu email allaqachon mavjud")

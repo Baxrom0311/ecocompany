@@ -13,10 +13,16 @@ def validate_password_length(value: str) -> str:
     return value
 
 
+def normalize_email(value: str | None) -> str | None:
+    return value.strip().lower() if value else value
+
+
 class UserLogin(BaseModel):
     """Login so'rovi"""
     email: EmailStr
     password: str
+
+    _normalize_email = field_validator("email")(normalize_email)
 
 
 class UserCreate(BaseModel):
@@ -26,6 +32,8 @@ class UserCreate(BaseModel):
     name: str
     role: str = "editor"
     is_active: bool = True
+
+    _normalize_email = field_validator("email")(normalize_email)
 
     @field_validator("password")
     @classmethod
@@ -53,6 +61,8 @@ class UserUpdate(BaseModel):
     name: str | None = None
     role: str | None = None
     is_active: bool | None = None
+
+    _normalize_email = field_validator("email")(normalize_email)
 
     @field_validator("role")
     @classmethod

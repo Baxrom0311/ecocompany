@@ -206,3 +206,45 @@ def test_migrations_fresh_and_existing_database(tmp_path):
             assert 'token_version' in [row[1] for row in connection.execute('PRAGMA table_info(users)')]
             if legacy: assert connection.execute('SELECT token_version FROM users').fetchone() == (0,)
         alembic('downgrade', '002_add_indexes'); alembic('upgrade', 'head')
+
+
+def test_login_email_is_case_insensitive(client, admin_user):
+    response = client.post('/api/v1/auth/login', json={'email': 'Admin@Test.COM', 'password': 'Admin123!'})
+    assert response.status_code == 200
+
+
+def test_create_user_rejects_email_differing_only_by_case(client, admin_headers, admin_user):
+    response = client.post('/api/v1/admin/users', headers=admin_headers, json={
+        'email': 'ADMIN@test.com', 'password': 'Strong123!', 'name': 'Dup', 'role': 'editor',
+    })
+    assert response.status_code == 409
+
+
+def test_production_rejects_short_jwt_secret(monkeypatch):
+    from pydantic import ValidationError
+    from app.config import Settings
+
+    monkeypatch.setenv('ENVIRONMENT', 'production')
+    monkeypatch.setenv('JWT_SECRET', 'short')
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_chat_session_storage_is_capped(db):
+    import asyncio
+    from app.models.chat import ChatSession
+    from app.services import ai_service
+
+    session = ChatSession(session_id='capped', messages=[
+        {'role': 'user', 'content': str(i), 'timestamp': ''} for i in range(ai_service.MAX_STORED_MESSAGES)
+    ], message_count=ai_service.MAX_STORED_MESSAGES)
+    db.add(session)
+    db.commit()
+
+    with patch.object(ai_service, '_generate_reply', new=AsyncMock(return_value='ok')):
+        asyncio.run(ai_service.chat('capped', 'yangi', '127.0.0.1', db))
+
+    db.refresh(session)
+    assert len(session.messages) == ai_service.MAX_STORED_MESSAGES
+    assert session.messages[-1]['content'] == 'ok'
+    assert session.message_count == ai_service.MAX_STORED_MESSAGES + 2

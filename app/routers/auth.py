@@ -3,6 +3,7 @@ ECO COMPANY — Auth Router
 Login, me, logout endpointlari
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
@@ -24,7 +25,7 @@ async def login(request: Request, data: UserLogin, db: Session = Depends(get_db)
     """Admin login — email + password → JWT token"""
 
     # 1. Email bo'yicha user topish
-    user = db.query(User).filter(User.email == data.email).first()
+    user = db.query(User).filter(func.lower(User.email) == data.email).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

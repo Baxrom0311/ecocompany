@@ -57,14 +57,20 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Database tablolar yaratildi (development)")
 
     try:
-        with engine.connect() as conn:
+        with engine.connect():
             logger.info("✅ Database ulandi")
+    except Exception:
+        logger.exception("❌ Database'ga ulanib bo'lmadi")
+        if settings.is_production:
+            raise
+    else:
         from app.database import SessionLocal
         from app.services.init_data import seed_initial_data
-        with SessionLocal() as db:
-            seed_initial_data(db)
-    except Exception as e:
-        logger.warning(f"⚠️ Database ulanish yoki boshlang'ich ma'lumotlar xatosi: {e}")
+        try:
+            with SessionLocal() as db:
+                seed_initial_data(db)
+        except Exception:
+            logger.exception("❌ Boshlang'ich ma'lumotlarni yaratishda xato")
 
     async with mcp_app.lifespan(app):
         yield

@@ -3,6 +3,7 @@ ECO COMPANY — Application Configuration
 Pydantic Settings orqali .env fayldan sozlamalarni o'qish
 """
 from pathlib import Path
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
@@ -62,6 +63,12 @@ class Settings(BaseSettings):
 
     # ── Environment ──
     ENVIRONMENT: str = "development"
+
+    @model_validator(mode="after")
+    def _check_production_secrets(self) -> "Settings":
+        if self.is_production and len(self.JWT_SECRET) < 32:
+            raise ValueError("Production'da JWT_SECRET kamida 32 belgi bo'lishi kerak")
+        return self
 
     @property
     def is_production(self) -> bool:

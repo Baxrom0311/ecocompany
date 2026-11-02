@@ -50,6 +50,6 @@ def seed_initial_data(db: Session) -> None:
             db.commit()
             logger.info("✅ Boshlang'ich kategoriyalar yaratildi")
 
-    except Exception as e:
-        logger.warning(f"⚠️ Boshlang'ich ma'lumotlarni yaratishda ogohlantirish: {e}")
+    except Exception:
         db.rollback()
+        raise

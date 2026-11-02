@@ -65,6 +65,9 @@ TOOL FOYDALANISH:
 Javob berishda faktlarni shu tool natijalariga tayang."""
 
 
+MAX_STORED_MESSAGES = 200
+
+
 def _recent_messages(messages: list[dict]) -> list[dict[str, str]]:
     return [
         {"role": message["role"], "content": message["content"]}
@@ -205,8 +208,8 @@ async def chat(session_id: str | None, message: str, ip_address: str, db: Sessio
         }
     )
 
-    session.messages = messages
-    session.message_count = len(messages)
+    session.message_count = (session.message_count or 0) + 2
+    session.messages = messages[-MAX_STORED_MESSAGES:]
     session.last_message_at = datetime.now(timezone.utc)
     session.is_active = True
     db.commit()
